@@ -7,15 +7,19 @@ import {
   BarChart3,
   ChevronDown,
   LayoutDashboard,
+  Moon,
   Newspaper,
   Settings,
+  Sun,
   TrendingUp,
   Wallet,
   Zap,
 } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   const isDashboard = pathname === "/" || pathname === "/dashboard";
   const isAnalysis = pathname === "/chart";
@@ -88,6 +92,26 @@ export default function Sidebar() {
             <p>MetaTrader 5 Bridge</p>
           </div>
         </div>
+
+        {/* Theme Toggle Button */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="nav-item w-full flex items-center justify-between mb-1.5 cursor-pointer border border-transparent hover:border-(--border) transition-all"
+          title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+        >
+          <div className="flex items-center gap-3">
+            {theme === "dark" ? (
+              <Sun size={18} className="text-amber-400" />
+            ) : (
+              <Moon size={18} className="text-blue-600" />
+            )}
+            <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-(--panel-hover) text-(--muted)">
+            {theme}
+          </span>
+        </button>
 
         <Link
           className={`nav-item ${pathname === "/settings" ? "active" : ""}`}

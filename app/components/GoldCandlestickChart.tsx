@@ -16,8 +16,10 @@ import {
   Activity,
   BarChart3,
   Clock,
+  Moon,
   RefreshCw,
   ShieldAlert,
+  Sun,
   Target,
   TrendingDown,
   TrendingUp,
@@ -25,6 +27,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 const API_URL =
   process.env.NEXT_PUBLIC_MARKET_API_URL ??
@@ -277,6 +280,9 @@ function mergeCandles(
 }
 
 export default function GoldCandlestickChart() {
+  const { theme, toggleTheme } = useTheme();
+  const isLight = theme === "light";
+
   const containerRef = useRef<HTMLDivElement>(null);
   const rsiContainerRef = useRef<HTMLDivElement>(null);
 
@@ -784,6 +790,7 @@ export default function GoldCandlestickChart() {
     };
 
     const initialWidth = getContainerWidth();
+    const isThemeLight = document.documentElement.getAttribute("data-theme") === "light";
 
     const chart = createChart(element, {
       width: initialWidth > 0 ? initialWidth : 1200,
@@ -791,23 +798,23 @@ export default function GoldCandlestickChart() {
       layout: {
         background: {
           type: ColorType.Solid,
-          color: "#131722",
+          color: isThemeLight ? "#ffffff" : "#131722",
         },
-        textColor: "#787b86",
+        textColor: isThemeLight ? "#475569" : "#787b86",
       },
       grid: {
-        vertLines: { color: "#1e222d" },
-        horzLines: { color: "#1e222d" },
+        vertLines: { color: isThemeLight ? "#f1f5f9" : "#1e222d" },
+        horzLines: { color: isThemeLight ? "#f1f5f9" : "#1e222d" },
       },
       rightPriceScale: {
-        borderColor: "#2a2e39",
+        borderColor: isThemeLight ? "#e2e8f0" : "#2a2e39",
         scaleMargins: {
           top: 0.1,
           bottom: 0.1,
         },
       },
       timeScale: {
-        borderColor: "#2a2e39",
+        borderColor: isThemeLight ? "#e2e8f0" : "#2a2e39",
         timeVisible: true,
         secondsVisible: false,
       },
@@ -933,6 +940,7 @@ export default function GoldCandlestickChart() {
     };
 
     const initialWidth = getContainerWidth();
+    const isThemeLight = document.documentElement.getAttribute("data-theme") === "light";
 
     const chart = createChart(element, {
       width: initialWidth > 0 ? initialWidth : 1200,
@@ -940,25 +948,25 @@ export default function GoldCandlestickChart() {
       layout: {
         background: {
           type: ColorType.Solid,
-          color: "#131722",
+          color: isThemeLight ? "#ffffff" : "#131722",
         },
-        textColor: "#787b86",
+        textColor: isThemeLight ? "#475569" : "#787b86",
       },
       grid: {
-        vertLines: { color: "#1e222d" },
-        horzLines: { color: "#1e222d" },
+        vertLines: { color: isThemeLight ? "#f1f5f9" : "#1e222d" },
+        horzLines: { color: isThemeLight ? "#f1f5f9" : "#1e222d" },
       },
       rightPriceScale: {
-        borderColor: "#2a2e39",
+        borderColor: isThemeLight ? "#e2e8f0" : "#2a2e39",
       },
       timeScale: {
-        borderColor: "#2a2e39",
+        borderColor: isThemeLight ? "#e2e8f0" : "#2a2e39",
         timeVisible: true,
         secondsVisible: false,
       },
       crosshair: {
-        vertLine: { color: "#758696", width: 1, style: 2 },
-        horzLine: { color: "#758696", width: 1, style: 2 },
+        vertLine: { color: isThemeLight ? "#94a3b8" : "#758696", width: 1, style: 2 },
+        horzLine: { color: isThemeLight ? "#94a3b8" : "#758696", width: 1, style: 2 },
       },
     });
 
@@ -1087,6 +1095,65 @@ export default function GoldCandlestickChart() {
       ema50Ref.current = null;
     };
   }, []);
+
+  // ---------------------------------------------------------
+  // 4b. Dynamic Light / Dark mode re-theming for charts
+  // ---------------------------------------------------------
+  useEffect(() => {
+    const isLightMode = theme === "light";
+    const bg = isLightMode ? "#ffffff" : "#131722";
+    const gridColor = isLightMode ? "#f1f5f9" : "#1e222d";
+    const borderColor = isLightMode ? "#e2e8f0" : "#2a2e39";
+    const textColor = isLightMode ? "#475569" : "#787b86";
+
+    if (chartRef.current) {
+      chartRef.current.applyOptions({
+        layout: {
+          background: {
+            type: ColorType.Solid,
+            color: bg,
+          },
+          textColor,
+        },
+        grid: {
+          vertLines: { color: gridColor },
+          horzLines: { color: gridColor },
+        },
+        rightPriceScale: {
+          borderColor,
+        },
+        timeScale: {
+          borderColor,
+        },
+        crosshair: {
+          vertLine: { color: isLightMode ? "#94a3b8" : "#758696", width: 1, style: 2 },
+          horzLine: { color: isLightMode ? "#94a3b8" : "#758696", width: 1, style: 2 },
+        },
+      });
+    }
+
+    if (rsiChartRef.current) {
+      rsiChartRef.current.applyOptions({
+        layout: {
+          background: {
+            type: ColorType.Solid,
+            color: bg,
+          },
+          textColor,
+        },
+        grid: {
+          vertLines: { color: gridColor },
+          horzLines: { color: gridColor },
+        },
+        rightPriceScale: {
+          borderColor,
+        },
+        timeScale: {
+          borderColor,
+        },
+      });
+    }
+  }, [theme]);
 
   // ---------------------------------------------------------
   // 5. Update chart series when historical candle data changes
@@ -1378,24 +1445,24 @@ export default function GoldCandlestickChart() {
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-[#2a2e39] bg-[#131722] text-[#d1d4dc] shadow-2xl flex flex-col w-full min-w-0 max-w-full select-none">
+    <section className="overflow-hidden rounded-xl border border-(--card-border) bg-(--card-bg) text-(--card-text) shadow-2xl flex flex-col w-full min-w-0 max-w-full select-none">
       {/* 1. TRADINGVIEW TOP BAR */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2a2e39] bg-[#131722] px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-(--card-border) bg-(--card-bg) px-3 py-2 text-xs">
         {/* Left: Symbol & Real-Time Price */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-            <h2 className="text-sm font-bold text-white tracking-tight">{symbol}</h2>
-            <span className="rounded bg-[#1e222d] border border-[#2a2e39] px-1.5 py-0.5 text-[10px] text-amber-400 font-semibold">
+            <h2 className="text-sm font-bold text-(--text) tracking-tight">{symbol}</h2>
+            <span className="rounded bg-(--pill-bg) border border-(--card-border) px-1.5 py-0.5 text-[10px] text-amber-500 font-semibold">
               GOLD SPOT
             </span>
           </div>
 
-          <div className="h-4 w-px bg-[#2a2e39]" />
+          <div className="h-4 w-px bg-(--card-border)" />
 
           {/* Real-time Price Ticker */}
           <div className="flex items-center gap-2 font-mono">
-            <span className="text-base font-bold text-white">
+            <span className="text-base font-bold text-(--text)">
               {formatPrice(currentPrice)}
             </span>
             <span
@@ -1407,11 +1474,9 @@ export default function GoldCandlestickChart() {
           </div>
         </div>
 
-
-
         {/* Center: Timeframe Pills & Candle Limit */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 rounded-lg bg-[#1e222d] border border-[#2a2e39] p-0.5">
+          <div className="flex items-center gap-0.5 rounded-lg bg-(--pill-bg) border border-(--card-border) p-0.5">
             {TIMEFRAMES.map(({ value, label }) => (
               <button
                 key={value}
@@ -1422,7 +1487,7 @@ export default function GoldCandlestickChart() {
                 }}
                 className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${interval === value
                   ? "bg-[#2962ff] text-white"
-                  : "text-[#787b86] hover:bg-[#2a2e39] hover:text-white"
+                  : "text-(--muted) hover:bg-(--panel-hover) hover:text-(--text)"
                   }`}
               >
                 {label}
@@ -1436,7 +1501,7 @@ export default function GoldCandlestickChart() {
               previousCandleCountRef.current = 0;
               setLimit(e.target.value);
             }}
-            className="rounded-lg border border-[#2a2e39] bg-[#1e222d] px-2 py-1 text-xs text-[#d1d4dc] outline-none cursor-pointer"
+            className="rounded-lg border border-(--card-border) bg-(--pill-bg) px-2 py-1 text-xs text-(--card-text) outline-none cursor-pointer"
           >
             <option value="10000">10000 bars</option>
             <option value="5000">5000 bars</option>
@@ -1456,8 +1521,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowEMA9((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showEMA9
-                ? "bg-amber-400/15 border-amber-400/40 text-amber-400"
-                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-amber-400/15 border-amber-400/40 text-amber-500 font-bold"
+                : "bg-(--pill-bg) border-(--card-border) text-(--muted)"
                 }`}
             >
               EMA 9
@@ -1466,8 +1531,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowEMA21((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showEMA21
-                ? "bg-sky-400/15 border-sky-400/40 text-sky-400"
-                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-sky-400/15 border-sky-400/40 text-sky-500 font-bold"
+                : "bg-(--pill-bg) border-(--card-border) text-(--muted)"
                 }`}
             >
               EMA 21
@@ -1476,8 +1541,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowEMA50((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showEMA50
-                ? "bg-purple-400/15 border-purple-400/40 text-purple-400"
-                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-purple-400/15 border-purple-400/40 text-purple-500 font-bold"
+                : "bg-(--pill-bg) border-(--card-border) text-(--muted)"
                 }`}
             >
               EMA 50
@@ -1486,8 +1551,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowRSI((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showRSI
-                ? "bg-violet-400/15 border-violet-400/40 text-violet-400"
-                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-violet-400/15 border-violet-400/40 text-violet-500 font-bold"
+                : "bg-(--pill-bg) border-(--card-border) text-(--muted)"
                 }`}
             >
               RSI 14
@@ -1496,8 +1561,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowSetupLines((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors inline-flex items-center gap-1.5 ${showSetupLines && activeSetup
-                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-sm shadow-emerald-500/20"
-                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500 shadow-sm shadow-emerald-500/20"
+                : "bg-(--pill-bg) border-(--card-border) text-(--muted)"
                 }`}
               title="Toggle Confirmed Entry, SL, and TP horizontal price lines on chart"
             >
@@ -1506,7 +1571,7 @@ export default function GoldCandlestickChart() {
             </button>
           </div>
 
-          <div className="h-4 w-px bg-[#2a2e39]" />
+          <div className="h-4 w-px bg-(--card-border)" />
 
           {/* Connection Status */}
           <div className="flex items-center gap-1.5 text-[11px] font-medium">
@@ -1523,7 +1588,7 @@ export default function GoldCandlestickChart() {
                 socketStatus === "connected"
                   ? "text-[#089981]"
                   : socketStatus === "connecting"
-                    ? "text-amber-400"
+                    ? "text-amber-500"
                     : "text-[#f23645]"
               }
             >
@@ -1535,6 +1600,7 @@ export default function GoldCandlestickChart() {
             </span>
           </div>
 
+          {/* Refresh Button */}
           <button
             type="button"
             title="Refresh Data"
@@ -1543,15 +1609,35 @@ export default function GoldCandlestickChart() {
               setRefreshKey((v) => v + 1);
             }}
             disabled={loading}
-            className="flex h-7 w-7 items-center justify-center rounded bg-[#1e222d] border border-[#2a2e39] text-[#787b86] hover:text-white transition-colors disabled:opacity-50"
+            className="flex h-7 w-7 items-center justify-center rounded bg-(--pill-bg) border border-(--card-border) text-(--muted) hover:text-(--text) transition-colors disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          </button>
+
+          {/* Theme Quick Toggle Button */}
+          <button
+            type="button"
+            title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            onClick={toggleTheme}
+            className="flex items-center gap-1 px-2 h-7 rounded bg-(--pill-bg) border border-(--card-border) text-[11px] font-semibold text-(--muted) hover:text-(--text) transition-colors cursor-pointer"
+          >
+            {theme === "dark" ? (
+              <>
+                <Sun size={13} className="text-amber-400" />
+                <span className="hidden sm:inline">Light</span>
+              </>
+            ) : (
+              <>
+                <Moon size={13} className="text-blue-600" />
+                <span className="hidden sm:inline">Dark</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
       {/* 2. MAIN TRADINGVIEW CHART CANVAS */}
-      <div className="flex flex-1 flex-col relative overflow-hidden bg-[#131722] min-h-125">
+      <div className="flex flex-1 flex-col relative overflow-hidden bg-(--card-bg) min-h-125">
         {/* Floating Legend: OHLC Readout */}
         <div className="absolute top-2 left-4 z-20 flex flex-col gap-1 text-[11px] pointer-events-auto">
           <div className="flex items-center gap-3 font-mono text-[11px] text-[#787b86]">
@@ -1651,11 +1737,11 @@ export default function GoldCandlestickChart() {
 
         {/* Active Open Positions Bar */}
         {openPositions.length > 0 && (
-          <div className="w-full border-b border-[#2a2e39] bg-[#161a25] px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="w-full border-b border-(--card-border) bg-(--panel) px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-semibold text-white">Open MT5 Positions ({openPositions.length}):</span>
-              <span className="text-[#787b86] text-[11px]">
+              <span className="font-semibold text-(--text)">Open MT5 Positions ({openPositions.length}):</span>
+              <span className="text-(--muted) text-[11px]">
                 Net P/L:{" "}
                 <span
                   className={`font-mono font-bold ${openPositions.reduce((acc, p) => acc + (p.profit || 0), 0) >= 0
@@ -1672,7 +1758,7 @@ export default function GoldCandlestickChart() {
               {openPositions.map((pos) => (
                 <div
                   key={pos.ticket}
-                  className="flex items-center gap-2 rounded bg-[#1e222d] border border-[#2a2e39] px-2.5 py-1 text-[11px]"
+                  className="flex items-center gap-2 rounded bg-(--pill-bg) border border-(--card-border) px-2.5 py-1 text-[11px]"
                 >
                   <span
                     className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${pos.type === "BUY"
@@ -1682,8 +1768,8 @@ export default function GoldCandlestickChart() {
                   >
                     {pos.type} {pos.volume}
                   </span>
-                  <span className="font-mono text-[#787b86]">#{pos.ticket}</span>
-                  <span className="font-mono text-[#d1d4dc]">@{pos.price_open.toFixed(2)}</span>
+                  <span className="font-mono text-(--muted)">#{pos.ticket}</span>
+                  <span className="font-mono text-(--card-text)">@{pos.price_open.toFixed(2)}</span>
                   <span
                     className={`font-mono font-semibold ${pos.profit >= 0 ? "text-[#089981]" : "text-[#f23645]"
                       }`}
@@ -1705,7 +1791,7 @@ export default function GoldCandlestickChart() {
                 type="button"
                 disabled={isOrdering}
                 onClick={() => handleClosePosition()}
-                className="px-2.5 py-1 rounded bg-[#2a2e39] hover:bg-[#363c4e] text-xs font-semibold text-[#d1d4dc] hover:text-white transition-all cursor-pointer border border-[#363c4e] active:scale-95"
+                className="px-2.5 py-1 rounded bg-(--pill-bg) hover:bg-(--panel-hover) text-xs font-semibold text-(--card-text) transition-all cursor-pointer border border-(--card-border) active:scale-95"
               >
                 Close All
               </button>
@@ -1715,14 +1801,14 @@ export default function GoldCandlestickChart() {
 
         {/* RSI Sub-pane (Collapsible) */}
         {showRSI && (
-          <div className="w-full border-b border-[#2a2e39] bg-[#131722] relative shrink-0 min-w-0 max-w-full overflow-hidden">
+          <div className="w-full border-b border-(--card-border) bg-(--card-bg) relative shrink-0 min-w-0 max-w-full overflow-hidden">
             <div className="flex items-center justify-between text-[11px] px-3 pt-2 pb-1">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-[#a78bfa]">RSI 14</span>
-                <span className="text-[#787b86]">Close</span>
+                <span className="text-(--muted)">Close</span>
               </div>
               <div className="flex items-center gap-3 text-[10px]">
-                <span className="text-[#787b86]">Overbought 70 · Mid 50 · Oversold 30</span>
+                <span className="text-(--muted)">Overbought 70 · Mid 50 · Oversold 30</span>
                 <span className={`font-mono font-bold text-xs ${rsiColor}`}>
                   {latest?.rsi != null ? latest.rsi.toFixed(2) : "—"}
                 </span>
@@ -1732,15 +1818,13 @@ export default function GoldCandlestickChart() {
           </div>
         )}
 
-
-
         {/* Main Candlestick Chart Canvas */}
         <div className="relative flex-1 w-full min-w-0 max-w-full min-h-115 overflow-hidden">
           {/* Confirmed Trade Setup Floating Pill (Top-Left overlay) */}
           {activeSetup && (
-            <div className="absolute top-3 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg bg-[#131722]/95 border border-[#2a2e39] p-1.5 backdrop-blur-md shadow-2xl text-xs select-none">
+            <div className="absolute top-3 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg bg-(--card-bg)/95 border border-(--card-border) p-1.5 backdrop-blur-md shadow-2xl text-xs select-none">
               {/* Direction & Status Tag */}
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#1e222d] border border-[#2a2e39]">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-(--pill-bg) border border-(--card-border)">
                 <span className={`w-2 h-2 rounded-full animate-pulse ${activeSetup.direction === "BUY" ? "bg-[#089981]" : "bg-[#f23645]"}`} />
                 {activeSetup.direction === "BUY" ? (
                   <TrendingUp className="w-3.5 h-3.5 text-[#089981]" />
@@ -1756,7 +1840,7 @@ export default function GoldCandlestickChart() {
               <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#2962ff]/10 border border-[#2962ff]/30 text-[11px]">
                 <Target className="w-3.5 h-3.5 text-[#2962ff]" />
                 <span className="text-[#93c5fd] font-semibold text-[10px] uppercase tracking-wide">Entry:</span>
-                <span className="font-mono font-bold text-white">
+                <span className="font-mono font-bold text-(--text)">
                   {activeSetup.entry_price ? activeSetup.entry_price.toFixed(2) : "—"}
                 </span>
               </div>
@@ -1811,8 +1895,8 @@ export default function GoldCandlestickChart() {
 
               {/* PnL Points Diff */}
               {currentPrice != null && activeSetup.entry_price && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#1e222d] border border-[#2a2e39] text-[11px]">
-                  <span className="text-[#787b86] text-[10px] uppercase tracking-wide">Diff:</span>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-(--pill-bg) border border-(--card-border) text-[11px]">
+                  <span className="text-(--muted) text-[10px] uppercase tracking-wide">Diff:</span>
                   <span
                     className={`font-mono font-bold ${(activeSetup.direction === "BUY" ? currentPrice - activeSetup.entry_price : activeSetup.entry_price - currentPrice) >= 0
                       ? "text-[#089981]"
@@ -1829,7 +1913,7 @@ export default function GoldCandlestickChart() {
               <button
                 type="button"
                 onClick={() => setShowSetupLines(!showSetupLines)}
-                className="px-2 py-1 text-[10px] text-[#787b86] hover:text-white hover:underline cursor-pointer"
+                className="px-2 py-1 text-[10px] text-(--muted) hover:text-(--text) hover:underline cursor-pointer"
                 title="Toggle Entry, SL, and TP horizontal lines on the candlestick chart"
               >
                 {showSetupLines ? "Hide lines" : "Show lines"}
@@ -1838,7 +1922,7 @@ export default function GoldCandlestickChart() {
           )}
 
           {loading && candles.length === 0 && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#131722]/80 backdrop-blur-sm text-xs text-[#787b86]">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-(--card-bg)/80 backdrop-blur-sm text-xs text-(--muted)">
               <RefreshCw className="mr-2 animate-spin text-[#2962ff]" size={16} />
               Loading {symbol} historical candles...
             </div>
@@ -1847,7 +1931,7 @@ export default function GoldCandlestickChart() {
           <div ref={containerRef} className="w-full h-full min-h-115 min-w-0 max-w-full overflow-hidden" />
 
           {/* Candle Countdown Pill */}
-          <div className="absolute bottom-2 right-20 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#1e222d] border border-[#2a2e39] text-[10px] font-mono text-[#787b86]">
+          <div className="absolute bottom-2 right-20 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-(--pill-bg) border border-(--card-border) text-[10px] font-mono text-(--muted)">
             <Clock size={11} className="text-amber-400" />
             <span>Bar Close:</span>
             <strong className="text-amber-400">{candleCountdown}</strong>
@@ -1856,19 +1940,19 @@ export default function GoldCandlestickChart() {
       </div>
 
       {/* 3. TRADINGVIEW BOTTOM STATUS STRIP */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#2a2e39] bg-[#131722] px-4 py-2 text-xs text-[#787b86]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--card-border) bg-(--card-bg) px-4 py-2 text-xs text-(--muted)">
         <div className="flex items-center gap-4">
           <span>
-            ATR: <strong className="text-amber-400 font-mono">{formatPrice(latest?.atr)}</strong>
+            ATR: <strong className="text-amber-500 font-mono">{formatPrice(latest?.atr)}</strong>
           </span>
           <span>
-            EMA 9: <strong className="text-amber-400 font-mono">{formatPrice(latest?.ema9)}</strong>
+            EMA 9: <strong className="text-amber-500 font-mono">{formatPrice(latest?.ema9)}</strong>
           </span>
           <span>
-            EMA 21: <strong className="text-sky-400 font-mono">{formatPrice(latest?.ema21)}</strong>
+            EMA 21: <strong className="text-sky-500 font-mono">{formatPrice(latest?.ema21)}</strong>
           </span>
           <span>
-            EMA 50: <strong className="text-purple-400 font-mono">{formatPrice(latest?.ema50)}</strong>
+            EMA 50: <strong className="text-purple-500 font-mono">{formatPrice(latest?.ema50)}</strong>
           </span>
         </div>
 

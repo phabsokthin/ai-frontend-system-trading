@@ -88,16 +88,16 @@ export default function ExnessAccountRegistration() {
       </header>
 
       <div className="max-w-2xl mx-auto my-6">
-        <section className="rounded-xl border border-[#2a2e39] bg-[#131722] p-6 shadow-2xl text-[#d1d4dc]">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[#2a2e39]">
+        <section className="rounded-xl border border-(--card-border) bg-(--card-bg) p-6 shadow-2xl text-(--card-text)">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-(--card-border)">
             <div className="p-2.5 rounded-lg bg-[#2962ff]/10 border border-[#2962ff]/30 text-[#2962ff]">
               <KeyRound size={22} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
+              <h2 className="text-lg font-bold text-(--text) tracking-tight">
                 Register MT5 Account
               </h2>
-              <p className="text-xs text-[#787b86] mt-0.5">
+              <p className="text-xs text-(--muted) mt-0.5">
                 Connect your Exness demo account to execute automated gold trades.
               </p>
             </div>
@@ -105,7 +105,7 @@ export default function ExnessAccountRegistration() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="accountName" className="block text-xs font-semibold text-[#8da2bf] mb-1.5 uppercase tracking-wide">
+              <label htmlFor="accountName" className="block text-xs font-semibold text-(--muted) mb-1.5 uppercase tracking-wide">
                 Account Name / Label
               </label>
               <input
@@ -114,13 +114,13 @@ export default function ExnessAccountRegistration() {
                 onChange={(e) => setAccountName(e.target.value)}
                 required
                 maxLength={80}
-                className="w-full rounded-lg border border-[#2a2e39] bg-[#1e222d] px-3.5 py-2.5 text-sm text-white placeholder-[#787b86] focus:border-[#2962ff] focus:outline-none transition-colors"
+                className="w-full rounded-lg border border-(--card-border) bg-(--pill-bg) px-3.5 py-2.5 text-sm text-(--text) placeholder-(--muted) focus:border-[#2962ff] focus:outline-none transition-colors"
                 placeholder="Exness Demo"
               />
             </div>
 
             <div>
-              <label htmlFor="mt5Login" className="block text-xs font-semibold text-[#8da2bf] mb-1.5 uppercase tracking-wide">
+              <label htmlFor="mt5Login" className="block text-xs font-semibold text-(--muted) mb-1.5 uppercase tracking-wide">
                 MT5 Login Number
               </label>
               <input
@@ -131,13 +131,13 @@ export default function ExnessAccountRegistration() {
                 inputMode="numeric"
                 pattern="[0-9]+"
                 autoComplete="off"
-                className="w-full rounded-lg border border-[#2a2e39] bg-[#1e222d] px-3.5 py-2.5 text-sm font-mono text-white placeholder-[#787b86] focus:border-[#2962ff] focus:outline-none transition-colors"
+                className="w-full rounded-lg border border-(--card-border) bg-(--pill-bg) px-3.5 py-2.5 text-sm font-mono text-(--text) placeholder-(--muted) focus:border-[#2962ff] focus:outline-none transition-colors"
                 placeholder="e.g. 19283746"
               />
             </div>
 
             <div>
-              <label htmlFor="mt5Server" className="block text-xs font-semibold text-[#8da2bf] mb-1.5 uppercase tracking-wide">
+              <label htmlFor="mt5Server" className="block text-xs font-semibold text-(--muted) mb-1.5 uppercase tracking-wide">
                 MT5 Server
               </label>
               <input
@@ -147,13 +147,13 @@ export default function ExnessAccountRegistration() {
                 required
                 maxLength={150}
                 autoComplete="off"
-                className="w-full rounded-lg border border-[#2a2e39] bg-[#1e222d] px-3.5 py-2.5 text-sm font-mono text-white placeholder-[#787b86] focus:border-[#2962ff] focus:outline-none transition-colors"
+                className="w-full rounded-lg border border-(--card-border) bg-(--pill-bg) px-3.5 py-2.5 text-sm font-mono text-(--text) placeholder-(--muted) focus:border-[#2962ff] focus:outline-none transition-colors"
                 placeholder="e.g. Exness-MT5Trial10"
               />
             </div>
 
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-[#1e222d] border border-[#2a2e39] text-xs text-[#787b86]">
-              <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-(--pill-bg) border border-(--card-border) text-xs text-(--muted)">
+              <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
               <span>
                 Antigravity security notice: Never enter trading passwords or private tokens here.
               </span>

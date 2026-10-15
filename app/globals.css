@@ -1,7 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
-:root {
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
   --background: #0b1120;
   --panel: #111b2c;
@@ -12,6 +13,33 @@
   --blue: #45a7ff;
   --green: #32d6a0;
   --red: #ff6b79;
+  --sidebar-bg: #0d1524;
+  --card-bg: #131722;
+  --card-border: #2a2e39;
+  --card-text: #d1d4dc;
+  --pill-bg: #1e222d;
+  --pill-border: #2a2e39;
+  --pill-text: #d1d4dc;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --background: #f8fafc;
+  --panel: #ffffff;
+  --panel-hover: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --blue: #2563eb;
+  --green: #089981;
+  --red: #f23645;
+  --sidebar-bg: #ffffff;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --card-text: #1e293b;
+  --pill-bg: #f1f5f9;
+  --pill-border: #e2e8f0;
+  --pill-text: #334155;
 }
 
 * {
@@ -57,8 +85,9 @@ button {
   display: flex;
   flex-direction: column;
   padding: 25px 17px 15px;
-  background: #0d1524;
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .brand {
@@ -88,12 +117,12 @@ button {
   display: block;
   margin-top: 5px;
   font-size: 9px;
-  color: #8da2bf;
+  color: var(--muted);
   letter-spacing: 1.3px;
 }
 
 .nav-label {
-  color: #667892;
+  color: var(--muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.2px;
@@ -112,18 +141,18 @@ button {
   gap: 12px;
   padding: 12px;
   border-radius: 8px;
-  color: #93a2b9;
+  color: var(--muted);
   transition: background 0.2s, color 0.2s;
 }
 
 .nav-item:hover {
   background: var(--panel-hover);
-  color: white;
+  color: var(--text);
 }
 
 .nav-item.active {
-  color: #65b7ff;
-  background: #172b44;
+  color: var(--blue);
+  background: var(--panel-hover);
   font-weight: 600;
 }
 
@@ -135,8 +164,8 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #111e2e;
-  border: 1px solid #24374a;
+  background: var(--panel);
+  border: 1px solid var(--border);
   padding: 13px 11px;
   border-radius: 10px;
   margin-bottom: 15px;
@@ -180,8 +209,8 @@ button {
   width: 35px;
   height: 35px;
   border-radius: 50%;
-  background: #263d60;
-  color: #8fcaff;
+  background: var(--panel-hover);
+  color: var(--blue);
   font-weight: 700;
 }
 
@@ -1058,4 +1087,231 @@ tbody tr:last-child td {
   .signal-meta strong {
     text-align: left;
   }
+}
+
+/* ========================================================
+   LIGHT MODE SYSTEM OVERRIDES
+   ======================================================== */
+[data-theme="light"] {
+  --background: #f8fafc;
+  --panel: #ffffff;
+  --panel-hover: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --sidebar-bg: #ffffff;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --card-text: #1e293b;
+  --pill-bg: #f8fafc;
+  --pill-border: #e2e8f0;
+  --pill-text: #334155;
+}
+
+[data-theme="light"] body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+[data-theme="light"] .sidebar {
+  background: #ffffff;
+  border-right-color: #e2e8f0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .brand strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .nav-label {
+  color: #64748b;
+}
+
+[data-theme="light"] .nav-item {
+  color: #475569;
+}
+
+[data-theme="light"] .nav-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+[data-theme="light"] .nav-item.active {
+  color: #2563eb;
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+[data-theme="light"] .connection-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+[data-theme="light"] .avatar {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .topbar {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .topbar h1 {
+  color: #0f172a;
+}
+
+[data-theme="light"] .breadcrumb,
+[data-theme="light"] .market-status,
+[data-theme="light"] .date-display {
+  color: #64748b;
+}
+
+[data-theme="light"] .icon-button {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .icon-button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+[data-theme="light"] .stat-card,
+[data-theme="light"] .panel {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .stat-top {
+  color: #64748b;
+}
+
+[data-theme="light"] .stat-icon {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+[data-theme="light"] .stat-value {
+  color: #0f172a;
+}
+
+[data-theme="light"] .eyebrow {
+  color: #64748b;
+}
+
+[data-theme="light"] .large-price {
+  color: #0f172a;
+}
+
+[data-theme="light"] .chart-legend {
+  color: #64748b;
+}
+
+[data-theme="light"] .chart-footer {
+  color: #64748b;
+}
+
+[data-theme="light"] .timeframe-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .timeframe-card h3 {
+  color: #0f172a;
+}
+
+[data-theme="light"] .timeframe-card p,
+[data-theme="light"] .meter-caption {
+  color: #64748b;
+}
+
+[data-theme="light"] .meter-caption strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .timeframe-meter {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] table th {
+  background: #f8fafc;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] table td {
+  border-bottom-color: #f1f5f9;
+  color: #334155;
+}
+
+[data-theme="light"] .table-disclaimer {
+  color: #64748b;
+}
+
+[data-theme="light"] .news-item {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .news-time {
+  color: #64748b;
+}
+
+[data-theme="light"] .news-content strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .news-content p {
+  color: #64748b;
+}
+
+[data-theme="light"] .news-warning {
+  background: #fefce8;
+  border-color: #fef08a;
+  color: #854d0e;
+}
+
+[data-theme="light"] .preview-banner {
+  background: #fefce8;
+  border-color: #fef08a;
+  color: #854d0e;
+}
+
+[data-theme="light"] .signal-banner.sell-banner {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+[data-theme="light"] .signal-symbol {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+[data-theme="light"] .signal-banner>div:nth-child(2)>span {
+  color: #991b1b;
+}
+
+[data-theme="light"] .signal-banner p {
+  color: #b91c1c;
+}
+
+[data-theme="light"] .signal-reason {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+[data-theme="light"] .signal-reason p {
+  color: #047857;
+}
+
+[data-theme="light"] .footer {
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
 }
