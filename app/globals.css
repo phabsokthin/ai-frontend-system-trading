@@ -192,8 +192,11 @@ button {
 
 .main-content {
   margin-left: 245px;
-  padding: 0 30px;
-  max-width: 1800px;
+  width: calc(100% - 245px);
+  max-width: 100%;
+  padding: 0 24px;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .topbar {
@@ -892,8 +895,10 @@ tbody tr:last-child td {
 @media (min-width: 1600px) {
   .main-content {
     margin-left: 245px;
-    padding-left: 38px;
-    padding-right: 38px;
+    width: calc(100% - 245px);
+    max-width: 100%;
+    padding-left: 32px;
+    padding-right: 32px;
   }
 
   .price-chart {
@@ -908,7 +913,10 @@ tbody tr:last-child td {
 
   .main-content {
     margin-left: 210px;
+    width: calc(100% - 210px);
+    max-width: 100%;
     padding: 0 20px;
+    box-sizing: border-box;
   }
 
   .content-grid,
@@ -972,7 +980,10 @@ tbody tr:last-child td {
 
   .main-content {
     margin-left: 64px;
+    width: calc(100% - 64px);
+    max-width: 100%;
     padding: 0 14px;
+    box-sizing: border-box;
   }
 
   .topbar {

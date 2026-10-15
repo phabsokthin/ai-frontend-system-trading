@@ -294,7 +294,7 @@ export default function GoldCandlestickChart() {
   const intervalRef = useRef("5min");
 
   const [interval, setIntervalValue] = useState("5min");
-  const [limit, setLimit] = useState("500");
+  const [limit, setLimit] = useState("10000");
 
   const [showEMA9, setShowEMA9] = useState(true);
   const [showEMA21, setShowEMA21] = useState(true);
@@ -763,8 +763,30 @@ export default function GoldCandlestickChart() {
     const element = rsiContainerRef.current;
     if (!element) return;
 
+    const getContainerWidth = () => {
+      const parentWidth = element.parentElement ? Math.floor(element.parentElement.clientWidth) : 0;
+      const elementWidth = Math.floor(element.clientWidth);
+      const rectWidth = element.parentElement
+        ? Math.floor(element.parentElement.getBoundingClientRect().width)
+        : Math.floor(element.getBoundingClientRect().width);
+
+      const measured = Math.max(parentWidth, elementWidth, rectWidth);
+      if (measured > 100) return measured;
+
+      if (typeof window !== "undefined") {
+        const sidebarWidth = window.innerWidth <= 760 ? 64 : window.innerWidth <= 1250 ? 210 : 245;
+        const padding = window.innerWidth <= 760 ? 28 : window.innerWidth <= 1250 ? 40 : 48;
+        const calculated = window.innerWidth - sidebarWidth - padding;
+        if (calculated > 100) return Math.floor(calculated);
+        return Math.floor(window.innerWidth);
+      }
+      return 1200;
+    };
+
+    const initialWidth = getContainerWidth();
+
     const chart = createChart(element, {
-      width: element.clientWidth || 600,
+      width: initialWidth > 0 ? initialWidth : 1200,
       height: 135,
       layout: {
         background: {
@@ -829,16 +851,54 @@ export default function GoldCandlestickChart() {
     rsiChartRef.current = chart;
     rsiSeriesRef.current = series;
 
-    const observer = new ResizeObserver(() => {
-      if (element.clientWidth > 0) {
-        chart.applyOptions({ width: element.clientWidth });
+    const handleResize = () => {
+      if (!element || !chart) return;
+      const targetWidth = getContainerWidth();
+      if (targetWidth > 0) {
+        chart.applyOptions({ width: targetWidth });
       }
+    };
+
+    const observer = new ResizeObserver(() => {
+      handleResize();
     });
 
     observer.observe(element);
+    if (element.parentElement) {
+      observer.observe(element.parentElement);
+    }
+    if (typeof document !== "undefined" && document.body) {
+      observer.observe(document.body);
+    }
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("popstate", handleResize);
+    window.addEventListener("pageshow", handleResize);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleResize();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const rafId = requestAnimationFrame(handleResize);
+    const t1 = setTimeout(handleResize, 50);
+    const t2 = setTimeout(handleResize, 150);
+    const t3 = setTimeout(handleResize, 350);
+    const t4 = setTimeout(handleResize, 700);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
       observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("popstate", handleResize);
+      window.removeEventListener("pageshow", handleResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       chart.remove();
       rsiChartRef.current = null;
       rsiSeriesRef.current = null;
@@ -852,8 +912,30 @@ export default function GoldCandlestickChart() {
     const element = containerRef.current;
     if (!element) return;
 
+    const getContainerWidth = () => {
+      const parentWidth = element.parentElement ? Math.floor(element.parentElement.clientWidth) : 0;
+      const elementWidth = Math.floor(element.clientWidth);
+      const rectWidth = element.parentElement
+        ? Math.floor(element.parentElement.getBoundingClientRect().width)
+        : Math.floor(element.getBoundingClientRect().width);
+
+      const measured = Math.max(parentWidth, elementWidth, rectWidth);
+      if (measured > 100) return measured;
+
+      if (typeof window !== "undefined") {
+        const sidebarWidth = window.innerWidth <= 760 ? 64 : window.innerWidth <= 1250 ? 210 : 245;
+        const padding = window.innerWidth <= 760 ? 28 : window.innerWidth <= 1250 ? 40 : 48;
+        const calculated = window.innerWidth - sidebarWidth - padding;
+        if (calculated > 100) return Math.floor(calculated);
+        return Math.floor(window.innerWidth);
+      }
+      return 1200;
+    };
+
+    const initialWidth = getContainerWidth();
+
     const chart = createChart(element, {
-      width: element.clientWidth || 600,
+      width: initialWidth > 0 ? initialWidth : 1200,
       height: 480,
       layout: {
         background: {
@@ -948,16 +1030,54 @@ export default function GoldCandlestickChart() {
 
     checkAndSync();
 
-    const observer = new ResizeObserver(() => {
-      if (element.clientWidth > 0) {
-        chart.applyOptions({ width: element.clientWidth });
+    const handleResize = () => {
+      if (!element || !chart) return;
+      const targetWidth = getContainerWidth();
+      if (targetWidth > 0) {
+        chart.applyOptions({ width: targetWidth });
       }
+    };
+
+    const observer = new ResizeObserver(() => {
+      handleResize();
     });
 
     observer.observe(element);
+    if (element.parentElement) {
+      observer.observe(element.parentElement);
+    }
+    if (typeof document !== "undefined" && document.body) {
+      observer.observe(document.body);
+    }
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("popstate", handleResize);
+    window.addEventListener("pageshow", handleResize);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleResize();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const rafId = requestAnimationFrame(handleResize);
+    const t1 = setTimeout(handleResize, 50);
+    const t2 = setTimeout(handleResize, 150);
+    const t3 = setTimeout(handleResize, 350);
+    const t4 = setTimeout(handleResize, 700);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
       observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("popstate", handleResize);
+      window.removeEventListener("pageshow", handleResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       chart.remove();
 
       chartRef.current = null;
@@ -1038,27 +1158,27 @@ export default function GoldCandlestickChart() {
 
     // Safely remove existing setup price lines
     if (entryLineRef.current) {
-      try { series.removePriceLine(entryLineRef.current); } catch {}
+      try { series.removePriceLine(entryLineRef.current); } catch { }
       entryLineRef.current = null;
     }
     if (slLineRef.current) {
-      try { series.removePriceLine(slLineRef.current); } catch {}
+      try { series.removePriceLine(slLineRef.current); } catch { }
       slLineRef.current = null;
     }
     if (tpLineRef.current) {
-      try { series.removePriceLine(tpLineRef.current); } catch {}
+      try { series.removePriceLine(tpLineRef.current); } catch { }
       tpLineRef.current = null;
     }
     if (tp1LineRef.current) {
-      try { series.removePriceLine(tp1LineRef.current); } catch {}
+      try { series.removePriceLine(tp1LineRef.current); } catch { }
       tp1LineRef.current = null;
     }
     if (tp2LineRef.current) {
-      try { series.removePriceLine(tp2LineRef.current); } catch {}
+      try { series.removePriceLine(tp2LineRef.current); } catch { }
       tp2LineRef.current = null;
     }
     if (tp3LineRef.current) {
-      try { series.removePriceLine(tp3LineRef.current); } catch {}
+      try { series.removePriceLine(tp3LineRef.current); } catch { }
       tp3LineRef.current = null;
     }
 
@@ -1210,8 +1330,8 @@ export default function GoldCandlestickChart() {
     const targetLabel = ticket
       ? `position #${ticket}`
       : closeSide
-      ? `${closeSide} positions`
-      : `all ${symbol} positions`;
+        ? `${closeSide} positions`
+        : `all ${symbol} positions`;
 
     setOrderStatus({
       type: "loading",
@@ -1258,7 +1378,7 @@ export default function GoldCandlestickChart() {
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-[#2a2e39] bg-[#131722] text-[#d1d4dc] shadow-2xl flex flex-col w-full select-none">
+    <section className="overflow-hidden rounded-xl border border-[#2a2e39] bg-[#131722] text-[#d1d4dc] shadow-2xl flex flex-col w-full min-w-0 max-w-full select-none">
       {/* 1. TRADINGVIEW TOP BAR */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2a2e39] bg-[#131722] px-3 py-2 text-xs">
         {/* Left: Symbol & Real-Time Price */}
@@ -1301,8 +1421,8 @@ export default function GoldCandlestickChart() {
                   setIntervalValue(value);
                 }}
                 className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${interval === value
-                    ? "bg-[#2962ff] text-white"
-                    : "text-[#787b86] hover:bg-[#2a2e39] hover:text-white"
+                  ? "bg-[#2962ff] text-white"
+                  : "text-[#787b86] hover:bg-[#2a2e39] hover:text-white"
                   }`}
               >
                 {label}
@@ -1318,10 +1438,13 @@ export default function GoldCandlestickChart() {
             }}
             className="rounded-lg border border-[#2a2e39] bg-[#1e222d] px-2 py-1 text-xs text-[#d1d4dc] outline-none cursor-pointer"
           >
-            <option value="50">50 bars</option>
-            <option value="100">100 bars</option>
-            <option value="200">200 bars</option>
+            <option value="10000">10000 bars</option>
+            <option value="5000">5000 bars</option>
+            <option value="2500">2500 bars</option>
+            <option value="1000">1000 bars</option>
             <option value="500">500 bars</option>
+            <option value="200">200 bars</option>
+            <option value="100">100 bars</option>
           </select>
         </div>
 
@@ -1333,8 +1456,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowEMA9((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showEMA9
-                  ? "bg-amber-400/15 border-amber-400/40 text-amber-400"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-amber-400/15 border-amber-400/40 text-amber-400"
+                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
                 }`}
             >
               EMA 9
@@ -1343,8 +1466,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowEMA21((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showEMA21
-                  ? "bg-sky-400/15 border-sky-400/40 text-sky-400"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-sky-400/15 border-sky-400/40 text-sky-400"
+                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
                 }`}
             >
               EMA 21
@@ -1353,8 +1476,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowEMA50((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showEMA50
-                  ? "bg-purple-400/15 border-purple-400/40 text-purple-400"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-purple-400/15 border-purple-400/40 text-purple-400"
+                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
                 }`}
             >
               EMA 50
@@ -1363,8 +1486,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowRSI((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors ${showRSI
-                  ? "bg-violet-400/15 border-violet-400/40 text-violet-400"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-violet-400/15 border-violet-400/40 text-violet-400"
+                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
                 }`}
             >
               RSI 14
@@ -1373,8 +1496,8 @@ export default function GoldCandlestickChart() {
               type="button"
               onClick={() => setShowSetupLines((v) => !v)}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors inline-flex items-center gap-1.5 ${showSetupLines && activeSetup
-                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-sm shadow-emerald-500/20"
-                  : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-sm shadow-emerald-500/20"
+                : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
                 }`}
               title="Toggle Confirmed Entry, SL, and TP horizontal price lines on chart"
             >
@@ -1389,10 +1512,10 @@ export default function GoldCandlestickChart() {
           <div className="flex items-center gap-1.5 text-[11px] font-medium">
             <span
               className={`w-2 h-2 rounded-full ${socketStatus === "connected"
-                  ? "bg-[#089981] shadow-[0_0_8px_#089981]"
-                  : socketStatus === "connecting"
-                    ? "bg-amber-400"
-                    : "bg-[#f23645]"
+                ? "bg-[#089981] shadow-[0_0_8px_#089981]"
+                : socketStatus === "connecting"
+                  ? "bg-amber-400"
+                  : "bg-[#f23645]"
                 }`}
             />
             <span
@@ -1428,7 +1551,7 @@ export default function GoldCandlestickChart() {
       </div>
 
       {/* 2. MAIN TRADINGVIEW CHART CANVAS */}
-      <div className="flex flex-1 flex-col relative overflow-hidden bg-[#131722] min-h-[500px]">
+      <div className="flex flex-1 flex-col relative overflow-hidden bg-[#131722] min-h-125">
         {/* Floating Legend: OHLC Readout */}
         <div className="absolute top-2 left-4 z-20 flex flex-col gap-1 text-[11px] pointer-events-auto">
           <div className="flex items-center gap-3 font-mono text-[11px] text-[#787b86]">
@@ -1468,13 +1591,12 @@ export default function GoldCandlestickChart() {
           <div className="flex items-center gap-2">
             {orderStatus.type && (
               <span
-                className={`text-[11px] px-2.5 py-1 rounded border font-medium ${
-                  orderStatus.type === "success"
-                    ? "bg-[#089981]/15 border-[#089981]/40 text-[#089981]"
-                    : orderStatus.type === "error"
+                className={`text-[11px] px-2.5 py-1 rounded border font-medium ${orderStatus.type === "success"
+                  ? "bg-[#089981]/15 border-[#089981]/40 text-[#089981]"
+                  : orderStatus.type === "error"
                     ? "bg-[#f23645]/15 border-[#f23645]/40 text-[#f23645]"
                     : "bg-[#1e222d] border-[#2a2e39] text-amber-400"
-                }`}
+                  }`}
               >
                 {orderStatus.message}
               </span>
@@ -1536,11 +1658,10 @@ export default function GoldCandlestickChart() {
               <span className="text-[#787b86] text-[11px]">
                 Net P/L:{" "}
                 <span
-                  className={`font-mono font-bold ${
-                    openPositions.reduce((acc, p) => acc + (p.profit || 0), 0) >= 0
-                      ? "text-[#089981]"
-                      : "text-[#f23645]"
-                  }`}
+                  className={`font-mono font-bold ${openPositions.reduce((acc, p) => acc + (p.profit || 0), 0) >= 0
+                    ? "text-[#089981]"
+                    : "text-[#f23645]"
+                    }`}
                 >
                   {openPositions.reduce((acc, p) => acc + (p.profit || 0), 0) >= 0 ? "+" : ""}$
                   {openPositions.reduce((acc, p) => acc + (p.profit || 0), 0).toFixed(2)}
@@ -1554,20 +1675,18 @@ export default function GoldCandlestickChart() {
                   className="flex items-center gap-2 rounded bg-[#1e222d] border border-[#2a2e39] px-2.5 py-1 text-[11px]"
                 >
                   <span
-                    className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${
-                      pos.type === "BUY"
-                        ? "bg-[#089981]/20 text-[#089981] border border-[#089981]/40"
-                        : "bg-[#f23645]/20 text-[#f23645] border border-[#f23645]/40"
-                    }`}
+                    className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${pos.type === "BUY"
+                      ? "bg-[#089981]/20 text-[#089981] border border-[#089981]/40"
+                      : "bg-[#f23645]/20 text-[#f23645] border border-[#f23645]/40"
+                      }`}
                   >
                     {pos.type} {pos.volume}
                   </span>
                   <span className="font-mono text-[#787b86]">#{pos.ticket}</span>
                   <span className="font-mono text-[#d1d4dc]">@{pos.price_open.toFixed(2)}</span>
                   <span
-                    className={`font-mono font-semibold ${
-                      pos.profit >= 0 ? "text-[#089981]" : "text-[#f23645]"
-                    }`}
+                    className={`font-mono font-semibold ${pos.profit >= 0 ? "text-[#089981]" : "text-[#f23645]"
+                      }`}
                   >
                     {pos.profit >= 0 ? `+$${pos.profit.toFixed(2)}` : `-$${Math.abs(pos.profit).toFixed(2)}`}
                   </span>
@@ -1596,8 +1715,8 @@ export default function GoldCandlestickChart() {
 
         {/* RSI Sub-pane (Collapsible) */}
         {showRSI && (
-          <div className="w-full border-b border-[#2a2e39] bg-[#131722] p-2 relative flex-shrink-0">
-            <div className="flex items-center justify-between text-[11px] px-2 mb-1">
+          <div className="w-full border-b border-[#2a2e39] bg-[#131722] relative shrink-0 min-w-0 max-w-full overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] px-3 pt-2 pb-1">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-[#a78bfa]">RSI 14</span>
                 <span className="text-[#787b86]">Close</span>
@@ -1609,14 +1728,14 @@ export default function GoldCandlestickChart() {
                 </span>
               </div>
             </div>
-            <div ref={rsiContainerRef} className="w-full h-[130px]" />
+            <div ref={rsiContainerRef} className="w-full h-32.5 min-w-0 max-w-full overflow-hidden" />
           </div>
         )}
 
 
 
         {/* Main Candlestick Chart Canvas */}
-        <div className="relative flex-1 w-full min-h-[460px]">
+        <div className="relative flex-1 w-full min-w-0 max-w-full min-h-115 overflow-hidden">
           {/* Confirmed Trade Setup Floating Pill (Top-Left overlay) */}
           {activeSetup && (
             <div className="absolute top-3 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg bg-[#131722]/95 border border-[#2a2e39] p-1.5 backdrop-blur-md shadow-2xl text-xs select-none">
@@ -1695,11 +1814,10 @@ export default function GoldCandlestickChart() {
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#1e222d] border border-[#2a2e39] text-[11px]">
                   <span className="text-[#787b86] text-[10px] uppercase tracking-wide">Diff:</span>
                   <span
-                    className={`font-mono font-bold ${
-                      (activeSetup.direction === "BUY" ? currentPrice - activeSetup.entry_price : activeSetup.entry_price - currentPrice) >= 0
-                        ? "text-[#089981]"
-                        : "text-[#f23645]"
-                    }`}
+                    className={`font-mono font-bold ${(activeSetup.direction === "BUY" ? currentPrice - activeSetup.entry_price : activeSetup.entry_price - currentPrice) >= 0
+                      ? "text-[#089981]"
+                      : "text-[#f23645]"
+                      }`}
                   >
                     {activeSetup.direction === "BUY"
                       ? (currentPrice - activeSetup.entry_price >= 0 ? "+" : "") + (currentPrice - activeSetup.entry_price).toFixed(2)
@@ -1726,7 +1844,7 @@ export default function GoldCandlestickChart() {
             </div>
           )}
 
-          <div ref={containerRef} className="w-full h-full min-h-[460px]" />
+          <div ref={containerRef} className="w-full h-full min-h-115 min-w-0 max-w-full overflow-hidden" />
 
           {/* Candle Countdown Pill */}
           <div className="absolute bottom-2 right-20 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#1e222d] border border-[#2a2e39] text-[10px] font-mono text-[#787b86]">
