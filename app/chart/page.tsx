@@ -255,10 +255,7 @@ export default function Dashboard() {
         </header>
         <section className="">
           <GoldCandlestickChart />
-
-
         </section>
-
       </div>
     </main>
   );

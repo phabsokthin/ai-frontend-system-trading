@@ -17,6 +17,11 @@ import {
   BarChart3,
   Clock,
   RefreshCw,
+  ShieldAlert,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -327,9 +332,82 @@ export default function GoldCandlestickChart() {
 
   useEffect(() => {
     fetchPositions();
-    const timer = setInterval(fetchPositions, 10);
+    const timer = setInterval(fetchPositions, 2000);
     return () => clearInterval(timer);
   }, [fetchPositions]);
+
+  type ActiveSetup = {
+    direction: "BUY" | "SELL" | string;
+    entry_price: number;
+    stop_loss: number;
+    take_profit: number;
+    sl: number;
+    tp: number;
+    tp1?: number | null;
+    tp2?: number | null;
+    tp3?: number | null;
+    status?: string;
+    reason?: string;
+  };
+
+  const [activeSetup, setActiveSetup] = useState<ActiveSetup | null>(null);
+  const [showSetupLines, setShowSetupLines] = useState(true);
+
+  const entryLineRef = useRef<any>(null);
+  const slLineRef = useRef<any>(null);
+  const tpLineRef = useRef<any>(null);
+  const tp1LineRef = useRef<any>(null);
+  const tp2LineRef = useRef<any>(null);
+  const tp3LineRef = useRef<any>(null);
+
+  const fetchActiveSetup = useCallback(async () => {
+    try {
+      const res = await fetch(`${BACKEND_BASE_URL}/api/trades/active`);
+      if (res.ok) {
+        const data = await res.json();
+        // If inactive, FLAT, or no position and setup, clear immediately
+        if (!data.active || data.status === "FLAT" || (!data.position && !data.setup)) {
+          setActiveSetup(null);
+          return;
+        }
+
+        const active = data.position || data.setup;
+        if (
+          active &&
+          active.status !== "CLOSED_SL" &&
+          active.status !== "CLOSED_TP" &&
+          active.status !== "CLOSED" &&
+          (active.entry_price || active.stop_loss || active.sl)
+        ) {
+          setActiveSetup({
+            direction: active.direction,
+            entry_price: Number(active.entry_price),
+            stop_loss: Number(active.stop_loss || active.sl),
+            take_profit: Number(active.take_profit || active.tp),
+            sl: Number(active.sl || active.stop_loss),
+            tp: Number(active.tp || active.take_profit),
+            tp1: active.tp1 != null ? Number(active.tp1) : (data.setup?.tp1 != null ? Number(data.setup.tp1) : undefined),
+            tp2: active.tp2 != null ? Number(active.tp2) : (data.setup?.tp2 != null ? Number(data.setup.tp2) : (active.take_profit || active.tp ? Number(active.take_profit || active.tp) : undefined)),
+            tp3: active.tp3 != null ? Number(active.tp3) : (data.setup?.tp3 != null ? Number(data.setup.tp3) : undefined),
+            status: active.status || "OPEN",
+            reason: active.reason || active.entry_reason || "",
+          });
+        } else {
+          setActiveSetup(null);
+        }
+      } else {
+        setActiveSetup(null);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchActiveSetup();
+    const timer = setInterval(fetchActiveSetup, 3000);
+    return () => clearInterval(timer);
+  }, [fetchActiveSetup]);
 
   const [candles, setCandles] = useState<Candle[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
@@ -951,6 +1029,119 @@ export default function GoldCandlestickChart() {
     }
   }, [candles, showEMA9, showEMA21, showEMA50]);
 
+  // ---------------------------------------------------------
+  // 6. Draw / Update Confirmed Entry, SL, and TP Price Lines
+  // ---------------------------------------------------------
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+
+    // Safely remove existing setup price lines
+    if (entryLineRef.current) {
+      try { series.removePriceLine(entryLineRef.current); } catch {}
+      entryLineRef.current = null;
+    }
+    if (slLineRef.current) {
+      try { series.removePriceLine(slLineRef.current); } catch {}
+      slLineRef.current = null;
+    }
+    if (tpLineRef.current) {
+      try { series.removePriceLine(tpLineRef.current); } catch {}
+      tpLineRef.current = null;
+    }
+    if (tp1LineRef.current) {
+      try { series.removePriceLine(tp1LineRef.current); } catch {}
+      tp1LineRef.current = null;
+    }
+    if (tp2LineRef.current) {
+      try { series.removePriceLine(tp2LineRef.current); } catch {}
+      tp2LineRef.current = null;
+    }
+    if (tp3LineRef.current) {
+      try { series.removePriceLine(tp3LineRef.current); } catch {}
+      tp3LineRef.current = null;
+    }
+
+    if (!showSetupLines || !activeSetup) return;
+
+    const { direction, entry_price, sl, tp, stop_loss, take_profit, tp1, tp2, tp3 } = activeSetup;
+    const finalSl = sl || stop_loss;
+    const finalTp = tp || take_profit;
+    const isBuy = direction?.toUpperCase() === "BUY";
+
+    // 1. ENTRY Price Line (Solid Line)
+    if (entry_price && Number.isFinite(entry_price)) {
+      entryLineRef.current = series.createPriceLine({
+        price: entry_price,
+        color: isBuy ? "#089981" : "#f23645",
+        lineWidth: 2,
+        lineStyle: 0, // Solid
+        axisLabelVisible: true,
+        title: `🎯 ENTRY (${direction}) ${entry_price.toFixed(2)}`,
+      });
+    }
+
+    // 2. STOP LOSS (SL) Price Line (Dashed Red Line)
+    if (finalSl && Number.isFinite(finalSl)) {
+      slLineRef.current = series.createPriceLine({
+        price: finalSl,
+        color: "#f23645",
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: `🛡️ SL ${finalSl.toFixed(2)}`,
+      });
+    }
+
+    // 3. TAKE PROFIT (TP1, TP2, TP3) Price Lines (Dashed Green/Emerald Lines)
+    const hasMultiTp = (tp1 && Number.isFinite(tp1)) || (tp2 && Number.isFinite(tp2)) || (tp3 && Number.isFinite(tp3));
+
+    if (tp1 && Number.isFinite(tp1)) {
+      tp1LineRef.current = series.createPriceLine({
+        price: tp1,
+        color: "#34d399",
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: `🏆 TP1 ${tp1.toFixed(2)}`,
+      });
+    }
+
+    if (tp2 && Number.isFinite(tp2)) {
+      tp2LineRef.current = series.createPriceLine({
+        price: tp2,
+        color: "#059669",
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: `🏆 TP2 ${tp2.toFixed(2)}`,
+      });
+    }
+
+    if (tp3 && Number.isFinite(tp3)) {
+      tp3LineRef.current = series.createPriceLine({
+        price: tp3,
+        color: "#10b981",
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: `🏆 TP3 ${tp3.toFixed(2)}`,
+      });
+    }
+
+    // Fallback if individual TP1/TP2/TP3 levels aren't available
+    if (!hasMultiTp && finalTp && Number.isFinite(finalTp)) {
+      tpLineRef.current = series.createPriceLine({
+        price: finalTp,
+        color: "#089981",
+        lineWidth: 2,
+        lineStyle: 2, // Dashed
+        axisLabelVisible: true,
+        title: `🏆 TP ${finalTp.toFixed(2)}`,
+      });
+    }
+  }, [activeSetup, showSetupLines, candles]);
+
   const latest = candles.length ? candles[candles.length - 1] : null;
   const previous = candles.length > 1 ? candles[candles.length - 2] : latest;
   const price = currentPrice ?? (latest?.close ?? 0);
@@ -971,7 +1162,7 @@ export default function GoldCandlestickChart() {
     setIsOrdering(true);
     setOrderStatus({
       type: "loading",
-      message: `Executing ${side} ${parsedLotSize} lot(s)...`,
+      message: `Executing ${side} ${parsedLotSize} lot(s) @ ${formatPrice(executedPrice)}...`,
     });
 
     console.log(`[Order Initiated] ${side} ${parsedLotSize} lot(s) ${symbol} @ ${executedPrice}`);
@@ -984,6 +1175,7 @@ export default function GoldCandlestickChart() {
           action: side,
           volume: parsedLotSize,
           symbol: "XAUUSD",
+          price: executedPrice,
           comment: "GoldPilot Web",
         }),
       });
@@ -1049,7 +1241,9 @@ export default function GoldCandlestickChart() {
         const successMsg = `Closed ${data.closed_count} position(s) in MT5`;
         console.log(`[Close Position Success]`, data);
         setOrderStatus({ type: "success", message: successMsg });
+        setActiveSetup(null);
         fetchPositions();
+        fetchActiveSetup();
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Network error contacting trading backend";
@@ -1174,6 +1368,18 @@ export default function GoldCandlestickChart() {
                 }`}
             >
               RSI 14
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSetupLines((v) => !v)}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors inline-flex items-center gap-1.5 ${showSetupLines && activeSetup
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-sm shadow-emerald-500/20"
+                  : "bg-[#1e222d] border-[#2a2e39] text-[#787b86]"
+                }`}
+              title="Toggle Confirmed Entry, SL, and TP horizontal price lines on chart"
+            >
+              <Target size={12} />
+              Setup Lines (Entry/SL/TP)
             </button>
           </div>
 
@@ -1411,6 +1617,108 @@ export default function GoldCandlestickChart() {
 
         {/* Main Candlestick Chart Canvas */}
         <div className="relative flex-1 w-full min-h-[460px]">
+          {/* Confirmed Trade Setup Floating Pill (Top-Left overlay) */}
+          {activeSetup && (
+            <div className="absolute top-3 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg bg-[#131722]/95 border border-[#2a2e39] p-1.5 backdrop-blur-md shadow-2xl text-xs select-none">
+              {/* Direction & Status Tag */}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#1e222d] border border-[#2a2e39]">
+                <span className={`w-2 h-2 rounded-full animate-pulse ${activeSetup.direction === "BUY" ? "bg-[#089981]" : "bg-[#f23645]"}`} />
+                {activeSetup.direction === "BUY" ? (
+                  <TrendingUp className="w-3.5 h-3.5 text-[#089981]" />
+                ) : (
+                  <TrendingDown className="w-3.5 h-3.5 text-[#f23645]" />
+                )}
+                <span className={`font-bold uppercase tracking-wider text-[11px] ${activeSetup.direction === "BUY" ? "text-[#089981]" : "text-[#f23645]"}`}>
+                  CONFIRMED {activeSetup.direction} SETUP
+                </span>
+              </div>
+
+              {/* Entry Tag with Target Icon */}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#2962ff]/10 border border-[#2962ff]/30 text-[11px]">
+                <Target className="w-3.5 h-3.5 text-[#2962ff]" />
+                <span className="text-[#93c5fd] font-semibold text-[10px] uppercase tracking-wide">Entry:</span>
+                <span className="font-mono font-bold text-white">
+                  {activeSetup.entry_price ? activeSetup.entry_price.toFixed(2) : "—"}
+                </span>
+              </div>
+
+              {/* Stop Loss (SL) Tag with ShieldAlert Icon */}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#f23645]/10 border border-[#f23645]/30 text-[11px]">
+                <ShieldAlert className="w-3.5 h-3.5 text-[#f23645]" />
+                <span className="text-[#fca5a5] font-semibold text-[10px] uppercase tracking-wide">SL:</span>
+                <span className="font-mono font-bold text-[#f23645]">
+                  {activeSetup.sl ? activeSetup.sl.toFixed(2) : "—"}
+                </span>
+              </div>
+
+              {/* Take Profit (TP1, TP2, TP3) Tags with Trophy Icons */}
+              {activeSetup.tp1 != null ? (
+                <>
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#089981]/10 border border-[#089981]/30 text-[11px]">
+                    <Trophy className="w-3.5 h-3.5 text-[#34d399]" />
+                    <span className="text-[#34d399] font-semibold text-[10px] uppercase tracking-wide">TP 1:</span>
+                    <span className="font-mono font-bold text-[#34d399]">
+                      {activeSetup.tp1.toFixed(2)}
+                    </span>
+                  </div>
+                  {activeSetup.tp2 != null && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#089981]/15 border border-[#089981]/40 text-[11px]">
+                      <Trophy className="w-3.5 h-3.5 text-[#089981]" />
+                      <span className="text-[#86efac] font-semibold text-[10px] uppercase tracking-wide">TP 2:</span>
+                      <span className="font-mono font-bold text-[#089981]">
+                        {activeSetup.tp2.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {activeSetup.tp3 != null && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#089981]/20 border border-[#089981]/50 text-[11px]">
+                      <Trophy className="w-3.5 h-3.5 text-[#10b981]" />
+                      <span className="text-[#a7f3d0] font-semibold text-[10px] uppercase tracking-wide">TP 3:</span>
+                      <span className="font-mono font-bold text-[#10b981]">
+                        {activeSetup.tp3.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#089981]/10 border border-[#089981]/30 text-[11px]">
+                  <Trophy className="w-3.5 h-3.5 text-[#089981]" />
+                  <span className="text-[#86efac] font-semibold text-[10px] uppercase tracking-wide">TP:</span>
+                  <span className="font-mono font-bold text-[#089981]">
+                    {activeSetup.tp ? activeSetup.tp.toFixed(2) : "—"}
+                  </span>
+                </div>
+              )}
+
+              {/* PnL Points Diff */}
+              {currentPrice != null && activeSetup.entry_price && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#1e222d] border border-[#2a2e39] text-[11px]">
+                  <span className="text-[#787b86] text-[10px] uppercase tracking-wide">Diff:</span>
+                  <span
+                    className={`font-mono font-bold ${
+                      (activeSetup.direction === "BUY" ? currentPrice - activeSetup.entry_price : activeSetup.entry_price - currentPrice) >= 0
+                        ? "text-[#089981]"
+                        : "text-[#f23645]"
+                    }`}
+                  >
+                    {activeSetup.direction === "BUY"
+                      ? (currentPrice - activeSetup.entry_price >= 0 ? "+" : "") + (currentPrice - activeSetup.entry_price).toFixed(2)
+                      : (activeSetup.entry_price - currentPrice >= 0 ? "+" : "") + (activeSetup.entry_price - currentPrice).toFixed(2)} pts
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowSetupLines(!showSetupLines)}
+                className="px-2 py-1 text-[10px] text-[#787b86] hover:text-white hover:underline cursor-pointer"
+                title="Toggle Entry, SL, and TP horizontal lines on the candlestick chart"
+              >
+                {showSetupLines ? "Hide lines" : "Show lines"}
+              </button>
+            </div>
+          )}
+
           {loading && candles.length === 0 && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#131722]/80 backdrop-blur-sm text-xs text-[#787b86]">
               <RefreshCw className="mr-2 animate-spin text-[#2962ff]" size={16} />
