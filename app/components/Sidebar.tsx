@@ -64,16 +64,18 @@ export default function Sidebar() {
           <History size={18} />
           History
         </Link>
-        <Link
+        {/* <Link
           className="nav-item"
           href="/chart#performance"
         >
           <TrendingUp size={18} />
           Performance
-        </Link>
+        </Link> */}
         <Link
           className="nav-item"
-          href="http://0.0.0.0:3000/"
+          href="http://localhost:3000/"
+          target="_blank"
+          rel="noopener noreferrer"
         >
           <Newspaper size={18} />
           Economic News
@@ -119,13 +121,13 @@ export default function Sidebar() {
           </span>
         </button>
 
-        <Link
+        {/* <Link
           className={`nav-item ${pathname === "/settings" ? "active" : ""}`}
           href="/exness-login"
         >
           <Settings size={18} />
           Settings
-        </Link>
+        </Link> */}
 
         <div className="profile">
           <div className="avatar">AI</div>

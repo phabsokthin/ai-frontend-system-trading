@@ -185,11 +185,6 @@ export default function Dashboard() {
             <ArrowUpRight size={15} />
           </Link>
 
-          <div className="market-status">
-            <span className="online-dot" />
-            MongoDB Connected
-          </div>
-
           <div className="date-display">
             <CalendarDays size={16} />
             Oct 16, 2026

@@ -15,6 +15,7 @@ import {
 import {
   Activity,
   BarChart3,
+  Brush,
   Clock,
   Moon,
   RefreshCw,
@@ -28,6 +29,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { DrawingManager } from "lightweight-charts-drawing";
+import ChartDrawingLayer from "./ChartDrawingLayer";
 
 const API_URL =
   process.env.NEXT_PUBLIC_MARKET_API_URL ??
@@ -358,6 +361,8 @@ export default function GoldCandlestickChart() {
 
   const [activeSetup, setActiveSetup] = useState<ActiveSetup | null>(null);
   const [showSetupLines, setShowSetupLines] = useState(true);
+  const [showDrawingTools, setShowDrawingTools] = useState(true);
+  const [drawingManager, setDrawingManager] = useState<DrawingManager | null>(null);
 
   const entryLineRef = useRef<any>(null);
   const slLineRef = useRef<any>(null);
@@ -1006,6 +1011,40 @@ export default function GoldCandlestickChart() {
     ema21Ref.current = ema21;
     ema50Ref.current = ema50;
 
+    // Initialize lightweight-charts-drawing DrawingManager
+    let dm: DrawingManager | null = null;
+    try {
+      dm = new DrawingManager(chart, candleSeries, {
+        magnet: "weak",
+      });
+
+      // Restore saved drawings if present in localStorage
+      try {
+        const saved = localStorage.getItem("gold_chart_drawings");
+        if (saved) {
+          dm.importJSON(saved);
+        }
+      } catch {
+        // ignore
+      }
+
+      // Auto-save drawings to localStorage on change
+      dm.on("change", () => {
+        try {
+          const json = dm?.exportJSON();
+          if (json) {
+            localStorage.setItem("gold_chart_drawings", json);
+          }
+        } catch {
+          // ignore
+        }
+      });
+
+      setDrawingManager(dm);
+    } catch (err) {
+      console.warn("Failed to initialize DrawingManager:", err);
+    }
+
     // Two-way logical range synchronization between RSI and Candlestick charts
     let isSyncing = false;
     const timeScaleMain = chart.timeScale();
@@ -1086,6 +1125,15 @@ export default function GoldCandlestickChart() {
       window.removeEventListener("popstate", handleResize);
       window.removeEventListener("pageshow", handleResize);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (dm) {
+        try {
+          dm.destroy();
+        } catch {
+          // ignore
+        }
+      }
+      setDrawingManager(null);
+
       chart.remove();
 
       chartRef.current = null;
@@ -1569,6 +1617,18 @@ export default function GoldCandlestickChart() {
               <Target size={12} />
               Setup Lines (Entry/SL/TP)
             </button>
+            <button
+              type="button"
+              onClick={() => setShowDrawingTools((v) => !v)}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors inline-flex items-center gap-1.5 ${showDrawingTools
+                ? "bg-[#2962ff]/20 border-[#2962ff]/50 text-[#93c5fd] font-bold shadow-sm shadow-[#2962ff]/20"
+                : "bg-(--pill-bg) border-(--card-border) text-(--muted)"
+                }`}
+              title="Toggle TradingView Drawing Tools (Lines, Brush, Fibonacci, Forecasting)"
+            >
+              <Brush size={12} className={showDrawingTools ? "text-amber-400" : ""} />
+              Drawing Tools
+            </button>
           </div>
 
           <div className="h-4 w-px bg-(--card-border)" />
@@ -1819,10 +1879,10 @@ export default function GoldCandlestickChart() {
         )}
 
         {/* Main Candlestick Chart Canvas */}
-        <div className="relative flex-1 w-full min-w-0 max-w-full min-h-115 overflow-hidden">
-          {/* Confirmed Trade Setup Floating Pill (Top-Left overlay) */}
+        <div className="relative flex-1 w-full min-w-0 max-w-full min-h-120">
+          {/* Confirmed Trade Setup Floating Pill (Top-Left overlay, offset for toolbar) */}
           {activeSetup && (
-            <div className="absolute top-3 left-4 z-20 flex flex-wrap items-center gap-2 rounded-lg bg-(--card-bg)/95 border border-(--card-border) p-1.5 backdrop-blur-md shadow-2xl text-xs select-none">
+            <div className="absolute top-3 left-14 z-20 flex flex-wrap items-center gap-2 rounded-lg bg-(--card-bg)/95 border border-(--card-border) p-1.5 backdrop-blur-md shadow-2xl text-xs select-none">
               {/* Direction & Status Tag */}
               <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-(--pill-bg) border border-(--card-border)">
                 <span className={`w-2 h-2 rounded-full animate-pulse ${activeSetup.direction === "BUY" ? "bg-[#089981]" : "bg-[#f23645]"}`} />
@@ -1929,6 +1989,16 @@ export default function GoldCandlestickChart() {
           )}
 
           <div ref={containerRef} className="w-full h-full min-h-115 min-w-0 max-w-full overflow-hidden" />
+
+          {/* Interactive TradingView Drawing Tools Layer (powered by lightweight-charts-drawing) */}
+          {showDrawingTools && (
+            <ChartDrawingLayer
+              chartRef={chartRef}
+              seriesRef={candleSeriesRef}
+              candles={candles}
+              drawingManager={drawingManager}
+            />
+          )}
 
           {/* Candle Countdown Pill */}
           <div className="absolute bottom-2 right-20 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded bg-(--pill-bg) border border-(--card-border) text-[10px] font-mono text-(--muted)">

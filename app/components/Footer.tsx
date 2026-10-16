@@ -52,10 +52,8 @@ export default function Footer() {
                     <span className="font-semibold text-[#a7b5c8]">
                         <p>&copy; {year} AI Trading System (Version 1.0.0)</p>
                     </span>
-                    <span className="hidden sm:inline text-[#2a2e39]">&bull;</span>
-                    <span className="rounded bg-[#1e222d] border border-[#2a2e39] px-2 py-0.5 text-[10px] font-mono text-[#8da2bf]">
-                        v2.4.0-prod
-                    </span>
+             
+                   
                     <span className="hidden sm:inline text-[#2a2e39]">&bull;</span>
                     <nav className="flex items-center gap-4 text-[11px]">
                         <Link href="/dashboard" className="hover:text-white transition-colors">
@@ -64,21 +62,19 @@ export default function Footer() {
                         <Link href="/chart" className="hover:text-white transition-colors">
                             AI Analysis
                         </Link>
-                        <Link href="/exness-login" className="hover:text-white transition-colors">
-                            Exness MT5
-                        </Link>
+                    
                     </nav>
                 </div>
 
                 <span>
                     <CheckCircle2 size={14} />
-                    <span>MetaTrader 5 Algorithmic Engine Synchronized</span>
+                    <span>MetaTrader 5 Algorithmic Engine Synchronized By<b>Thin Developer</b> </span>
                 </span>
             </div>
 
             {/* Legal & Market Risk Disclaimer */}
             <p className="mt-2 text-[10px] leading-relaxed text-[#5a6a80]">
-                Risk Disclaimer: Trading spot gold (XAU/USD) and leveraged contracts carries high financial risk. Antigravity AI trade signals, entry triggers, stop loss (SL), and take profit (TP) targets are calculated automatically via algorithmic confluence and executed via the local MetaTrader 5 terminal. Always verify risk management rules before placing live orders.
+                Risk Disclaimer: Trading financial instruments—including stocks, foreign exchange (Forex), futures, options, contracts for difference (CFDs), and cryptocurrencies—carries a high level of risk and may not be suitable for all investors.
             </p>
         </footer>
     );

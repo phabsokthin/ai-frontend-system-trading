@@ -396,7 +396,7 @@ export default function TradeSignalsAndAnalysis({
         <div className="flex items-center gap-3 text-xs text-(--muted)">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-medium hidden sm:inline">MongoDB Live Sync</span>
+            <span className="text-[11px] font-medium hidden sm:inline">Live Sync</span>
           </div>
 
           {lastRefreshed && (
@@ -544,7 +544,7 @@ export default function TradeSignalsAndAnalysis({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Layers size={16} className="text-[#2962ff]" />
-                <h3 className="text-sm font-bold text-white">Confirmed AI Signals List (MongoDB)</h3>
+                <h3 className="text-sm font-bold text-white">Confirmed AI Signals List</h3>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-(--pill-bg) text-(--muted) border border-(--border)">

@@ -21,10 +21,7 @@ export default function HistoryPage() {
           {/* Language Switcher */}
           <GoogleTranslate variant="topbar" />
 
-          <div className="market-status">
-            <span className="online-dot" />
-            MongoDB Ledger
-          </div>
+        
           <button className="icon-button" aria-label="Notifications">
             <Bell size={19} />
             <span className="notification-dot" />
