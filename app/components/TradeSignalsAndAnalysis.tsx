@@ -143,13 +143,46 @@ type LatestAnalysis = {
       market_news_note?: string;
       active_blocking_event?: { name?: string; time?: string };
       next_event?: { name?: string; time?: string; minutes_until?: number; hours_until?: number; impact?: string };
+      todays_events?: Array<{ name: string; title?: string; time: string; currency: string; impact: string; forecast?: string; previous?: string }>;
+      upcoming_events?: Array<{ name: string; title?: string; time: string; currency: string; impact: string; minutes_until?: number; hours_until?: number; forecast?: string; previous?: string }>;
+      recent_past_events?: Array<{ name: string; title?: string; time: string; currency: string; impact: string; minutes_ago?: number; forecast?: string; previous?: string }>;
     };
   };
   news_analysis?: {
     status?: string;
+    has_news_today?: boolean;
     market_news_note?: string;
+    active_blocking_event?: { name?: string; time?: string };
     next_event?: { name?: string; time?: string; minutes_until?: number; hours_until?: number; impact?: string };
+    todays_events?: Array<{ name: string; title?: string; time: string; currency: string; impact: string; forecast?: string; previous?: string }>;
+    upcoming_events?: Array<{ name: string; title?: string; time: string; currency: string; impact: string; minutes_until?: number; hours_until?: number; forecast?: string; previous?: string }>;
+    recent_past_events?: Array<{ name: string; title?: string; time: string; currency: string; impact: string; minutes_ago?: number; forecast?: string; previous?: string }>;
   };
+};
+
+type AnalysisHistoryItem = {
+  _id?: string;
+  timestamp_utc: string;
+  symbol: string;
+  price?: number;
+  signal?: string;
+  action?: string;
+  reason?: string;
+  multi_timeframe?: {
+    analysis_timeframe?: string;
+    htf_trend?: string;
+    htf_rsi?: number;
+    entry_signal?: string;
+  };
+  support_resistance?: {
+    pivot_point?: number;
+    classic?: {
+      pivot?: number;
+      r1?: number;
+      s1?: number;
+    };
+  };
+  created_at?: string;
 };
 
 interface TradeSignalsAndAnalysisProps {
@@ -163,6 +196,7 @@ export default function TradeSignalsAndAnalysis({
   const [activeTrade, setActiveTrade] = useState<ActivePosition | null>(null);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>([]);
   const [signalsHistory, setSignalsHistory] = useState<SignalItem[]>([]);
+  const [analysisHistory, setAnalysisHistory] = useState<AnalysisHistoryItem[]>([]);
   const [latestAnalysis, setLatestAnalysis] = useState<LatestAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
@@ -177,12 +211,12 @@ export default function TradeSignalsAndAnalysis({
         .catch(() => null);
 
       // 2. Fetch trade history
-      const historyPromise = fetch(`${BACKEND_BASE_URL}/api/trades/history?limit=25`)
+      const historyPromise = fetch(`${BACKEND_BASE_URL}/api/trades/history?limit=30`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
       // 3. Fetch signal history
-      const signalsPromise = fetch(`${BACKEND_BASE_URL}/api/signals/history?limit=25`)
+      const signalsPromise = fetch(`${BACKEND_BASE_URL}/api/signals/history?limit=30`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
@@ -191,11 +225,17 @@ export default function TradeSignalsAndAnalysis({
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
-      const [activeRes, historyRes, signalsRes, analysisRes] = await Promise.all([
+      // 5. Fetch historical analysis snapshots
+      const analysisHistoryPromise = fetch(`${BACKEND_BASE_URL}/api/analysis/history?limit=30`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
+      const [activeRes, historyRes, signalsRes, analysisRes, analysisHistRes] = await Promise.all([
         activePromise,
         historyPromise,
         signalsPromise,
         analysisPromise,
+        analysisHistoryPromise,
       ]);
 
       if (activeRes && activeRes.active && (activeRes.position || activeRes.setup)) {
@@ -204,16 +244,38 @@ export default function TradeSignalsAndAnalysis({
         setActiveTrade(null);
       }
 
+      // Order trades DESC (newest exit or entry time first)
       if (historyRes && Array.isArray(historyRes.trades)) {
-        setTradeHistory(historyRes.trades);
+        const sortedTrades = [...historyRes.trades].sort((a, b) => {
+          const tA = new Date(a.exit_time || a.entry_time || a.created_at || 0).getTime();
+          const tB = new Date(b.exit_time || b.entry_time || b.created_at || 0).getTime();
+          return tB - tA;
+        });
+        setTradeHistory(sortedTrades);
       }
 
+      // Order signals DESC (newest signal timestamp first)
       if (signalsRes && Array.isArray(signalsRes.signals)) {
-        setSignalsHistory(signalsRes.signals);
+        const sortedSignals = [...signalsRes.signals].sort((a, b) => {
+          const tA = new Date(a.timestamp_utc || a.created_at || 0).getTime();
+          const tB = new Date(b.timestamp_utc || b.created_at || 0).getTime();
+          return tB - tA;
+        });
+        setSignalsHistory(sortedSignals);
       }
 
       if (analysisRes) {
         setLatestAnalysis(analysisRes);
+      }
+
+      // Order analysis snapshots DESC (newest timestamp first)
+      if (analysisHistRes && Array.isArray(analysisHistRes.history)) {
+        const sortedAnalysis = [...analysisHistRes.history].sort((a, b) => {
+          const tA = new Date(a.timestamp_utc || a.created_at || 0).getTime();
+          const tB = new Date(b.timestamp_utc || b.created_at || 0).getTime();
+          return tB - tA;
+        });
+        setAnalysisHistory(sortedAnalysis);
       }
 
       setLastRefreshed(new Date().toLocaleTimeString());
@@ -287,11 +349,10 @@ export default function TradeSignalsAndAnalysis({
           <button
             type="button"
             onClick={() => setActiveTab("signals")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "signals"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${activeTab === "signals"
                 ? "bg-[#2962ff] text-white shadow-sm"
                 : "text-(--muted) hover:text-(--card-text)"
-            }`}
+              }`}
           >
             <Zap size={14} className={activeTrade ? "text-amber-300 animate-pulse" : ""} />
             <span>AI Signals & Setups</span>
@@ -306,11 +367,10 @@ export default function TradeSignalsAndAnalysis({
           <button
             type="button"
             onClick={() => setActiveTab("trades")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "trades"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${activeTab === "trades"
                 ? "bg-[#2962ff] text-white shadow-sm"
                 : "text-(--muted) hover:text-(--card-text)"
-            }`}
+              }`}
           >
             <Wallet size={14} />
             <span>Closed Trade History</span>
@@ -322,11 +382,10 @@ export default function TradeSignalsAndAnalysis({
           <button
             type="button"
             onClick={() => setActiveTab("analysis")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "analysis"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${activeTab === "analysis"
                 ? "bg-[#2962ff] text-white shadow-sm"
                 : "text-(--muted) hover:text-(--card-text)"
-            }`}
+              }`}
           >
             <BarChart3 size={14} />
             <span>AI Multi-Timeframe Analysis</span>
@@ -363,11 +422,10 @@ export default function TradeSignalsAndAnalysis({
         <div className="p-4 sm:p-5 space-y-6">
           {/* Active Live Setup Hero Card */}
           {activeTrade ? (
-            <div className={`p-4 rounded-xl border relative overflow-hidden backdrop-blur-md transition-all ${
-              activeTrade.direction === "BUY"
+            <div className={`p-4 rounded-xl border relative overflow-hidden backdrop-blur-md transition-all ${activeTrade.direction === "BUY"
                 ? "border-emerald-500/40 bg-emerald-950/20 shadow-emerald-950/20"
                 : "border-red-500/40 bg-red-950/20 shadow-red-950/20"
-            }`}>
+              }`}>
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-(--card-border)/60">
                 <div className="flex items-center gap-2.5">
                   <div className={`p-2 rounded-lg ${activeTrade.direction === "BUY" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
@@ -375,11 +433,10 @@ export default function TradeSignalsAndAnalysis({
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
-                        activeTrade.direction === "BUY"
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${activeTrade.direction === "BUY"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                           : "bg-red-500/20 text-red-400 border border-red-500/40"
-                      }`}>
+                        }`}>
                         CONFIRMED {activeTrade.direction} SETUP
                       </span>
                       <span className="text-[11px] text-(--muted) font-mono">
@@ -396,9 +453,8 @@ export default function TradeSignalsAndAnalysis({
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <span className="text-[10px] uppercase tracking-wider text-(--muted) block">Unrealized PnL</span>
-                    <span className={`font-mono font-bold text-sm ${
-                      (activeTrade.unrealized_pnl_points ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
-                    }`}>
+                    <span className={`font-mono font-bold text-sm ${(activeTrade.unrealized_pnl_points ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}>
                       {(activeTrade.unrealized_pnl_points ?? 0) >= 0 ? "+" : ""}
                       {(activeTrade.unrealized_pnl_points ?? 0).toFixed(2)} pts
                     </span>
@@ -490,9 +546,14 @@ export default function TradeSignalsAndAnalysis({
                 <Layers size={16} className="text-[#2962ff]" />
                 <h3 className="text-sm font-bold text-white">Confirmed AI Signals List (MongoDB)</h3>
               </div>
-              <span className="text-xs text-(--muted)">
-                {signalsHistory.length} recorded signals
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-(--pill-bg) text-(--muted) border border-(--border)">
+                  ORDER: DESC (NEWEST FIRST)
+                </span>
+                <span className="text-xs text-(--muted)">
+                  {signalsHistory.length} recorded signals
+                </span>
+              </div>
             </div>
 
             {signalsHistory.length > 0 ? (
@@ -527,13 +588,12 @@ export default function TradeSignalsAndAnalysis({
                             {s.symbol || "XAU/USD"}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                              dir === "BUY"
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${dir === "BUY"
                                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                                 : dir === "SELL"
-                                ? "bg-red-500/15 text-red-400 border border-red-500/30"
-                                : "bg-gray-500/15 text-gray-400 border border-gray-500/30"
-                            }`}>
+                                  ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                                  : "bg-gray-500/15 text-gray-400 border border-gray-500/30"
+                              }`}>
                               {dir === "BUY" ? <ArrowUpRight size={11} /> : dir === "SELL" ? <ArrowDownRight size={11} /> : null}
                               {dir}
                             </span>
@@ -610,9 +670,14 @@ export default function TradeSignalsAndAnalysis({
                 <Trophy size={16} className="text-amber-400" />
                 Closed Trades History Log
               </h3>
-              <span className="text-xs text-(--muted)">
-                Archived from MongoDB & trade_history.jsonl
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-(--pill-bg) text-(--muted) border border-(--border)">
+                  ORDER: DESC (NEWEST FIRST)
+                </span>
+                <span className="text-xs text-(--muted)">
+                  Archived from MongoDB & trade_history.jsonl
+                </span>
+              </div>
             </div>
 
             {tradeHistory.length > 0 ? (
@@ -641,11 +706,10 @@ export default function TradeSignalsAndAnalysis({
                             {t.id}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              t.direction === "BUY"
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${t.direction === "BUY"
                                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                                 : "bg-red-500/15 text-red-400 border border-red-500/30"
-                            }`}>
+                              }`}>
                               {t.direction}
                             </span>
                           </td>
@@ -664,13 +728,12 @@ export default function TradeSignalsAndAnalysis({
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-(--muted) max-w-xs truncate" title={t.exit_reason}>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                              t.status === "CLOSED_TP"
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${t.status === "CLOSED_TP"
                                 ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
                                 : t.status === "CLOSED_SL"
-                                ? "bg-red-500/10 text-red-300 border border-red-500/20"
-                                : "bg-gray-500/10 text-gray-300"
-                            }`}>
+                                  ? "bg-red-500/10 text-red-300 border border-red-500/20"
+                                  : "bg-gray-500/10 text-gray-300"
+                              }`}>
                               {t.status || t.exit_reason || "CLOSED"}
                             </span>
                           </td>
@@ -706,13 +769,12 @@ export default function TradeSignalsAndAnalysis({
                       Macro Trend ({latestAnalysis.multi_timeframe?.analysis_timeframe || "1H"})
                     </span>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                        latestAnalysis.multi_timeframe?.htf_trend === "BULLISH"
+                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${latestAnalysis.multi_timeframe?.htf_trend === "BULLISH"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                           : latestAnalysis.multi_timeframe?.htf_trend === "BEARISH"
-                          ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                          : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                      }`}>
+                            ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                            : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        }`}>
                         {latestAnalysis.multi_timeframe?.htf_trend || "NEUTRAL"}
                       </span>
                       <span className="text-xs text-white font-mono font-semibold">
@@ -738,13 +800,12 @@ export default function TradeSignalsAndAnalysis({
                       Execution Trigger ({latestAnalysis.multi_timeframe?.entry_timeframe || "5MIN"})
                     </span>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                        latestAnalysis.signal === "BUY"
+                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${latestAnalysis.signal === "BUY"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                           : latestAnalysis.signal === "SELL"
-                          ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                          : "bg-gray-500/20 text-gray-300 border border-gray-500/40"
-                      }`}>
+                            ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                            : "bg-gray-500/20 text-gray-300 border border-gray-500/40"
+                        }`}>
                         SIGNAL: {latestAnalysis.signal || "WAIT"}
                       </span>
                       <span className="text-xs text-(--muted)">
@@ -765,11 +826,10 @@ export default function TradeSignalsAndAnalysis({
                       Economic News Filter
                     </span>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                        latestAnalysis.news_filter?.allowed
+                      <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider ${latestAnalysis.news_filter?.allowed
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                           : "bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse"
-                      }`}>
+                        }`}>
                         {latestAnalysis.news_filter?.allowed ? "CLEAR FOR TRADING" : "TRADING BLOCKED"}
                       </span>
                     </div>
@@ -855,6 +915,185 @@ export default function TradeSignalsAndAnalysis({
                   </div>
                 </div>
               )}
+
+              {/* Economic High-Impact News & Event Risk Matrix */}
+              <div className="p-4 rounded-xl border border-(--card-border) bg-(--panel) space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-(--card-border)">
+                  <div className="flex items-center gap-2">
+                    <Newspaper size={17} className="text-amber-400" />
+                    <h4 className="text-sm font-bold text-white">Economic News & Event Impact Matrix</h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${latestAnalysis.news_filter?.allowed
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                        : "bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse"
+                      }`}>
+                      {latestAnalysis.news_filter?.allowed ? "STATUS: CLEAR FOR TRADING" : "STATUS: TRADING SUSPENDED"}
+                    </span>
+                    {(latestAnalysis.news_analysis?.next_event || latestAnalysis.news_filter?.news_analysis?.next_event) && (
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-(--pill-bg) text-amber-300 border border-amber-500/30">
+                        Next: {(latestAnalysis.news_analysis?.next_event || latestAnalysis.news_filter?.news_analysis?.next_event)?.name} in {((latestAnalysis.news_analysis?.next_event || latestAnalysis.news_filter?.news_analysis?.next_event)?.hours_until) != null ? `${(latestAnalysis.news_analysis?.next_event || latestAnalysis.news_filter?.news_analysis?.next_event)?.hours_until}h` : `${(latestAnalysis.news_analysis?.next_event || latestAnalysis.news_filter?.news_analysis?.next_event)?.minutes_until}m`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Market Volatility Assessment Note */}
+                <div className="p-3 rounded-lg bg-(--pill-bg)/70 border border-(--card-border) text-xs text-(--card-text) leading-relaxed">
+                  <strong className="text-white">AI News Volatility Note: </strong>
+                  {latestAnalysis.news_analysis?.market_news_note || latestAnalysis.news_filter?.news_analysis?.market_news_note || latestAnalysis.news_filter?.reason || "No high-impact economic news window active."}
+                </div>
+
+                {/* Today's & Upcoming High-Impact Events Table */}
+                {((latestAnalysis.news_analysis?.todays_events && latestAnalysis.news_analysis.todays_events.length > 0) ||
+                  (latestAnalysis.news_analysis?.upcoming_events && latestAnalysis.news_analysis.upcoming_events.length > 0) ||
+                  (latestAnalysis.news_filter?.news_analysis?.todays_events && latestAnalysis.news_filter.news_analysis.todays_events.length > 0) ||
+                  (latestAnalysis.news_filter?.news_analysis?.upcoming_events && latestAnalysis.news_filter.news_analysis.upcoming_events.length > 0)) ? (
+                  <div className="overflow-x-auto rounded-lg border border-(--card-border)">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-(--card-border) bg-(--pill-bg) text-(--muted) text-[10px] uppercase tracking-wider">
+                          <th className="py-2.5 px-3">Time (UTC)</th>
+                          <th className="py-2.5 px-3">Event Name</th>
+                          <th className="py-2.5 px-3">Currency</th>
+                          <th className="py-2.5 px-3">Impact</th>
+                          <th className="py-2.5 px-3">Countdown / State</th>
+                          <th className="py-2.5 px-3">Forecast / Previous</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-(--card-border)">
+                        {(
+                          latestAnalysis.news_analysis?.todays_events ||
+                          latestAnalysis.news_filter?.news_analysis?.todays_events ||
+                          latestAnalysis.news_analysis?.upcoming_events ||
+                          latestAnalysis.news_filter?.news_analysis?.upcoming_events ||
+                          []
+                        ).map((evt, idx) => (
+                          <tr key={idx} className="hover:bg-(--panel-hover) transition-colors">
+                            <td className="py-2.5 px-3 font-mono text-(--muted) whitespace-nowrap">
+                              {formatTime(evt.time)}
+                            </td>
+                            <td className="py-2.5 px-3 font-semibold text-white">
+                              {evt.name || evt.title}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-amber-300">
+                              {evt.currency || "USD"}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                                HIGH
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-xs">
+                              {(evt as any).minutes_until != null ? (
+                                <span className={(evt as any).minutes_until <= 30 ? "text-amber-400 font-bold animate-pulse" : "text-emerald-400 font-medium"}>
+                                  in {(evt as any).hours_until != null ? `${(evt as any).hours_until} hrs` : `${(evt as any).minutes_until} mins`}
+                                </span>
+                              ) : (
+                                <span className="text-(--muted)">Scheduled Today</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-(--muted)">
+                              <span>{evt.forecast || "—"}</span> / <span className="text-[#8da2bf]">{evt.previous || "—"}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg bg-(--pill-bg)/40 border border-(--card-border) text-center text-xs text-(--muted)">
+                    No high-impact economic news events scheduled in the current window.
+                  </div>
+                )}
+              </div>
+
+              {/* Analysis History Snapshots Log (Ordered DESC) */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Activity size={16} className="text-[#2962ff]" />
+                    Multi-Timeframe Analysis Snapshots
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-(--pill-bg) text-(--muted) border border-(--border)">
+                      ORDER: DESC (NEWEST FIRST)
+                    </span>
+                    <span className="text-xs text-(--muted)">
+                      {analysisHistory.length} recorded snapshots
+                    </span>
+                  </div>
+                </div>
+
+                {analysisHistory.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-(--card-border)">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-(--card-border) bg-(--panel) text-(--muted)">
+                          <th className="py-2.5 px-3">Time (UTC)</th>
+                          <th className="py-2.5 px-3">Price</th>
+                          <th className="py-2.5 px-3">Macro Trend (1H)</th>
+                          <th className="py-2.5 px-3">HTF RSI</th>
+                          <th className="py-2.5 px-3">Signal</th>
+                          <th className="py-2.5 px-3">Action</th>
+                          <th className="py-2.5 px-3">Pivot (P)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-(--card-border)">
+                        {analysisHistory.map((item, idx) => {
+                          const sig = item.signal || "WAIT";
+                          const trend = item.multi_timeframe?.htf_trend || "—";
+                          const pivot = item.support_resistance?.classic?.pivot || item.support_resistance?.pivot_point;
+
+                          return (
+                            <tr key={item._id || idx} className="hover:bg-(--panel)/60 transition-colors">
+                              <td className="py-2.5 px-3 font-mono text-(--muted) whitespace-nowrap">
+                                {formatTime(item.timestamp_utc || item.created_at)}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono font-semibold text-white">
+                                {item.price ? Number(item.price).toFixed(2) : "—"}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${trend === "BULLISH"
+                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                    : trend === "BEARISH"
+                                      ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                                      : "bg-gray-500/15 text-gray-400"
+                                  }`}>
+                                  {trend}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-white">
+                                {item.multi_timeframe?.htf_rsi != null ? Number(item.multi_timeframe.htf_rsi).toFixed(1) : "—"}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${sig === "BUY"
+                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                    : sig === "SELL"
+                                      ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                                      : "bg-gray-500/15 text-gray-400 border border-gray-500/30"
+                                  }`}>
+                                  {sig}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-(--muted)">
+                                {item.action || "HOLD"}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-(--muted)">
+                                {pivot ? Number(pivot).toFixed(2) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-lg bg-(--panel)/50 border border-(--card-border) text-center text-xs text-(--muted)">
+                    No historical analysis snapshots recorded yet.
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <div className="p-6 rounded-lg bg-(--panel)/50 border border-(--card-border) text-center text-xs text-(--muted)">

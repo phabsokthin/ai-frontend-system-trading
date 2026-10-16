@@ -6,6 +6,7 @@ import {
   History,
 } from "lucide-react";
 import TradeSignalsAndAnalysis from "../components/TradeSignalsAndAnalysis";
+import GoogleTranslate from "../components/GoogleTranslate";
 
 export default function HistoryPage() {
   return (
@@ -17,6 +18,9 @@ export default function HistoryPage() {
         </div>
 
         <div className="topbar-actions">
+          {/* Language Switcher */}
+          <GoogleTranslate variant="topbar" />
+
           <div className="market-status">
             <span className="online-dot" />
             MongoDB Ledger

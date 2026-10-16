@@ -7,6 +7,7 @@ import {
 
 import GoldCandlestickChart from "../components/GoldCandlestickChart";
 import TradeSignalsAndAnalysis from "../components/TradeSignalsAndAnalysis";
+import GoogleTranslate from "../components/GoogleTranslate";
 
 export default function ChartPage() {
   return (
@@ -18,6 +19,9 @@ export default function ChartPage() {
         </div>
 
         <div className="topbar-actions">
+          {/* Language Switcher */}
+          <GoogleTranslate variant="topbar" />
+
           <div className="market-status">
             <span className="online-dot" />
             Market Monitor

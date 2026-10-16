@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import GoogleTranslate from "./GoogleTranslate";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -94,6 +95,9 @@ export default function Sidebar() {
             <p>MetaTrader 5 Bridge</p>
           </div>
         </div>
+
+        {/* Language Translator (KH / ENG) */}
+        <GoogleTranslate variant="sidebar" />
 
         {/* Theme Toggle Button */}
         <button

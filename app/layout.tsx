@@ -31,6 +31,33 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       data-theme="dark"
     >
+      <head>
+        {/* Fix Google Translate DOM mutation conflict with React reconciliation */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof Node === "function" && Node.prototype) {
+                const origRemove = Node.prototype.removeChild;
+                Node.prototype.removeChild = function(child) {
+                  if (child.parentNode !== this) {
+                    if (child.parentNode) return child.parentNode.removeChild(child);
+                    return child;
+                  }
+                  return origRemove.apply(this, arguments);
+                };
+                const origInsert = Node.prototype.insertBefore;
+                Node.prototype.insertBefore = function(newNode, refNode) {
+                  if (refNode && refNode.parentNode !== this) {
+                    if (refNode.parentNode) return refNode.parentNode.insertBefore(newNode, refNode);
+                    return newNode;
+                  }
+                  return origInsert.apply(this, arguments);
+                };
+              }
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-(--background) text-(--text) transition-colors duration-200">
         <ThemeProvider>
           <div className="app-shell">
