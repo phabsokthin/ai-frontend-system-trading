@@ -300,7 +300,7 @@ export default function GoldCandlestickChart() {
   const intervalRef = useRef("5min");
 
   const [interval, setIntervalValue] = useState("5min");
-  const [limit, setLimit] = useState("10000");
+  const [limit, setLimit] = useState("5000");
 
   const [showEMA9, setShowEMA9] = useState(true);
   const [showEMA21, setShowEMA21] = useState(true);
@@ -1503,7 +1503,7 @@ export default function GoldCandlestickChart() {
             }}
             className="rounded-lg border border-(--card-border) bg-(--pill-bg) px-2 py-1 text-xs text-(--card-text) outline-none cursor-pointer"
           >
-            <option value="10000">10000 bars</option>
+     
             <option value="5000">5000 bars</option>
             <option value="2500">2500 bars</option>
             <option value="1000">1000 bars</option>

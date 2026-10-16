@@ -6,10 +6,11 @@ import {
 } from "lucide-react";
 
 import GoldCandlestickChart from "../components/GoldCandlestickChart";
+import TradeSignalsAndAnalysis from "../components/TradeSignalsAndAnalysis";
 
 export default function ChartPage() {
   return (
-    <div id="overview">
+    <div id="overview" className="space-y-6">
       <header className="topbar">
         <div>
           <div className="breadcrumb">Workspace / AI Analysis</div>
@@ -27,13 +28,21 @@ export default function ChartPage() {
           </button>
           <div className="date-display">
             <CalendarDays size={17} />
-            Oct 15, 2026
+            Oct 16, 2026
           </div>
         </div>
       </header>
+
+      {/* Interactive Candlestick Chart with Overlays & MT5 Execution */}
       <section className="w-full min-w-0 max-w-full">
         <GoldCandlestickChart />
+      </section>
+
+      {/* Comprehensive Signals List, Trade History, & Multi-Timeframe Analysis */}
+      <section className="w-full min-w-0 max-w-full">
+        <TradeSignalsAndAnalysis />
       </section>
     </div>
   );
 }
+

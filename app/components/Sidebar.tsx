@@ -6,6 +6,7 @@ import {
   Activity,
   BarChart3,
   ChevronDown,
+  History,
   LayoutDashboard,
   Moon,
   Newspaper,
@@ -23,6 +24,7 @@ export default function Sidebar() {
 
   const isDashboard = pathname === "/" || pathname === "/dashboard";
   const isAnalysis = pathname === "/chart";
+  const isHistory = pathname === "/history";
   const isExness = pathname === "/exness-login";
 
   return (
@@ -55,11 +57,11 @@ export default function Sidebar() {
           AI Analysis
         </Link>
         <Link
-          className="nav-item"
-          href="/chart#trades"
+          className={`nav-item ${isHistory ? "active" : ""}`}
+          href="/history"
         >
-          <Wallet size={18} />
-          Trade History
+          <History size={18} />
+          History
         </Link>
         <Link
           className="nav-item"
@@ -70,7 +72,7 @@ export default function Sidebar() {
         </Link>
         <Link
           className="nav-item"
-          href="/dashboard#news"
+          href="http://0.0.0.0:3000/"
         >
           <Newspaper size={18} />
           Economic News
