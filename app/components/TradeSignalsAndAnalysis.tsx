@@ -198,6 +198,7 @@ export default function TradeSignalsAndAnalysis({
   const [signalsHistory, setSignalsHistory] = useState<SignalItem[]>([]);
   const [analysisHistory, setAnalysisHistory] = useState<AnalysisHistoryItem[]>([]);
   const [latestAnalysis, setLatestAnalysis] = useState<LatestAnalysis | null>(null);
+  const [marketStatus, setMarketStatus] = useState<{ is_market_closed: boolean; reason: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -205,6 +206,11 @@ export default function TradeSignalsAndAnalysis({
   // Fetch all live data
   const fetchData = useCallback(async () => {
     try {
+      // 0. Fetch market status
+      const marketPromise = fetch(`${BACKEND_BASE_URL}/api/market/status`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
       // 1. Fetch active trade
       const activePromise = fetch(`${BACKEND_BASE_URL}/api/trades/active`)
         .then((r) => (r.ok ? r.json() : null))
@@ -230,13 +236,25 @@ export default function TradeSignalsAndAnalysis({
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 
-      const [activeRes, historyRes, signalsRes, analysisRes, analysisHistRes] = await Promise.all([
+      const [marketRes, activeRes, historyRes, signalsRes, analysisRes, analysisHistRes] = await Promise.all([
+        marketPromise,
         activePromise,
         historyPromise,
         signalsPromise,
         analysisPromise,
         analysisHistoryPromise,
       ]);
+
+      if (marketRes) {
+        setMarketStatus(marketRes);
+      } else {
+        const day = new Date().getUTCDay();
+        const isWknd = day === 0 || day === 6;
+        setMarketStatus({
+          is_market_closed: isWknd,
+          reason: isWknd ? "Weekend market closure (Saturday & Sunday)" : "Market is open",
+        });
+      }
 
       if (activeRes && activeRes.active && (activeRes.position || activeRes.setup)) {
         setActiveTrade(activeRes.position || activeRes.setup);
@@ -420,6 +438,22 @@ export default function TradeSignalsAndAnalysis({
       {/* 2. TAB 1: AI SIGNALS & ACTIVE SETUPS */}
       {activeTab === "signals" && (
         <div className="p-4 sm:p-5 space-y-6">
+          {/* Weekend Market Closed Banner */}
+          {marketStatus?.is_market_closed && (
+            <div className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-950/20 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-2.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <div>
+                  <strong className="text-white font-semibold">Weekend Market Closure (Saturday & Sunday):</strong>
+                  <span className="ml-1 text-amber-200/90">{marketStatus.reason || "Gold market is closed. All positions are closed and technical analysis is suspended."}</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold whitespace-nowrap">
+                MARKET CLOSED
+              </span>
+            </div>
+          )}
+
           {/* Active Live Setup Hero Card */}
           {activeTrade ? (
             <div className={`p-4 rounded-xl border relative overflow-hidden backdrop-blur-md transition-all ${activeTrade.direction === "BUY"
@@ -531,10 +565,14 @@ export default function TradeSignalsAndAnalysis({
             </div>
           ) : (
             <div className="p-6 rounded-xl border border-dashed border-(--card-border) bg-(--panel)/40 text-center">
-              <Compass size={28} className="mx-auto text-(--muted) opacity-50 mb-2" />
-              <h4 className="text-sm font-semibold text-white">No Active Open Position</h4>
+              <Compass size={28} className="mx-auto text-amber-400 opacity-60 mb-2" />
+              <h4 className="text-sm font-semibold text-white">
+                {marketStatus?.is_market_closed ? "Market Closed (Weekend)" : "No Active Open Position"}
+              </h4>
               <p className="text-xs text-(--muted) mt-1 max-w-md mx-auto">
-                The market guard is in <strong>WAIT</strong> mode. Technical confluence and economic news safety filters are monitoring for the next validated entry.
+                {marketStatus?.is_market_closed
+                  ? "Gold market is closed on Saturday and Sunday. All open positions have been automatically closed. Technical analysis is paused until market reopens Sunday evening."
+                  : "The market guard is in WAIT mode. Technical confluence and economic news safety filters are monitoring for the next validated entry."}
               </p>
             </div>
           )}
@@ -732,9 +770,11 @@ export default function TradeSignalsAndAnalysis({
                                 ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
                                 : t.status === "CLOSED_SL"
                                   ? "bg-red-500/10 text-red-300 border border-red-500/20"
-                                  : "bg-gray-500/10 text-gray-300"
+                                  : t.status === "CLOSED_WEEKEND"
+                                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                    : "bg-gray-500/10 text-gray-300"
                               }`}>
-                              {t.status || t.exit_reason || "CLOSED"}
+                              {t.status === "CLOSED_WEEKEND" ? "WEEKEND CLOSE" : (t.status || t.exit_reason || "CLOSED")}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-mono text-(--muted) whitespace-nowrap">

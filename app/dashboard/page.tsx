@@ -109,6 +109,12 @@ type ReportData = {
     action?: string;
     pivot_point?: number;
   };
+  market_status?: {
+    is_market_closed?: boolean;
+    market_status?: string;
+    reason?: string;
+    day_of_week?: string;
+  };
   recent_trades: TradeItem[];
   upcoming_news: NewsItem[];
 };
@@ -117,6 +123,20 @@ export default function Dashboard() {
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [currentDateStr, setCurrentDateStr] = useState<string>("");
+  const [isWeekend, setIsWeekend] = useState<boolean>(false);
+
+  useEffect(() => {
+    setCurrentDateStr(
+      new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    );
+    const day = new Date().getUTCDay();
+    setIsWeekend(day === 0 || day === 6);
+  }, []);
 
   const fetchReport = useCallback(async () => {
     try {
@@ -187,10 +207,26 @@ export default function Dashboard() {
 
           <div className="date-display">
             <CalendarDays size={16} />
-            Oct 16, 2026
+            {currentDateStr || "—"}
           </div>
         </div>
       </header>
+
+      {/* Weekend Market Closed Banner */}
+      {(report?.market_status?.is_market_closed || isWeekend) && (
+        <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-950/20 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <div>
+              <strong className="text-white font-semibold">Weekend Market Closure (Saturday & Sunday):</strong>
+              <span className="ml-1 text-amber-200/90">{report?.market_status?.reason || "Gold (XAU/USD) market is closed. All positions are closed and technical analysis is suspended until market opens Sunday evening."}</span>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold whitespace-nowrap">
+            MARKET CLOSED
+          </span>
+        </div>
+      )}
 
       {/* 2. STATS KPI GRID (LIVE REPORT METRICS) */}
       <div className="stats-grid">
@@ -262,14 +298,16 @@ export default function Dashboard() {
                 {activeTrade.direction} @ {activeTrade.entry_price?.toFixed(2)}
               </span>
             ) : (
-              <span className="text-(--muted) text-lg">FLAT (WAIT)</span>
+              <span className="text-(--muted) text-lg">
+                {(report?.market_status?.is_market_closed || isWeekend) ? "CLOSED (WEEKEND)" : "FLAT (WAIT)"}
+              </span>
             )}
           </div>
           <div className="stat-change text-[#8da2bf]">
             {activeTrade ? (
               <span>Target TP: {(activeTrade.tp2 ?? activeTrade.take_profit ?? activeTrade.tp)?.toFixed(2) || "—"}</span>
             ) : (
-              <span>Scanning multi-timeframe confluence</span>
+              <span>{(report?.market_status?.is_market_closed || isWeekend) ? "All positions closed for weekend" : "Scanning multi-timeframe confluence"}</span>
             )}
           </div>
         </div>

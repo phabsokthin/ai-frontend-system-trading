@@ -339,6 +339,31 @@ export default function GoldCandlestickChart() {
     }
   }, []);
 
+  const [isMarketClosed, setIsMarketClosed] = useState(false);
+  const [marketClosedReason, setMarketClosedReason] = useState("");
+
+  const checkMarketStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${BACKEND_BASE_URL}/api/market/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setIsMarketClosed(Boolean(data.is_market_closed));
+        setMarketClosedReason(data.reason || "");
+      }
+    } catch {
+      const day = new Date().getUTCDay();
+      const isWknd = day === 0 || day === 6;
+      setIsMarketClosed(isWknd);
+      setMarketClosedReason(isWknd ? "Weekend market closure (Saturday & Sunday)" : "");
+    }
+  }, []);
+
+  useEffect(() => {
+    checkMarketStatus();
+    const timer = setInterval(checkMarketStatus, 15000);
+    return () => clearInterval(timer);
+  }, [checkMarketStatus]);
+
   useEffect(() => {
     fetchPositions();
     const timer = setInterval(fetchPositions, 2000);
@@ -1392,6 +1417,16 @@ export default function GoldCandlestickChart() {
         ? "text-emerald-400"
         : "text-violet-400";
   const handleOrder = async (side: "BUY" | "SELL") => {
+    if (isMarketClosed) {
+      setOrderStatus({
+        type: "error",
+        message: "Market is closed on weekends (Saturday & Sunday). Orders cannot be placed.",
+      });
+      setTimeout(() => {
+        setOrderStatus((prev) => (prev.type === "error" ? { type: null, message: "" } : prev));
+      }, 5000);
+      return;
+    }
     const executedPrice = price || latest?.close || 0;
     const parsedLotSize = parseFloat(lotSize) || 0.01;
     setIsOrdering(true);
@@ -1551,7 +1586,7 @@ export default function GoldCandlestickChart() {
             }}
             className="rounded-lg border border-(--card-border) bg-(--pill-bg) px-2 py-1 text-xs text-(--card-text) outline-none cursor-pointer"
           >
-     
+
             <option value="5000">5000 bars</option>
             <option value="2500">2500 bars</option>
             <option value="1000">1000 bars</option>
@@ -1695,6 +1730,22 @@ export default function GoldCandlestickChart() {
           </button>
         </div>
       </div>
+
+      {/* Weekend Market Closed Banner */}
+      {isMarketClosed && (
+        <div className="w-full bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <div>
+              <strong className="text-white font-semibold">Weekend Market Closure (Saturday & Sunday):</strong>
+              <span className="ml-1 text-amber-200/90">{marketClosedReason || "Gold market is closed. All positions are closed and technical analysis is suspended."}</span>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold whitespace-nowrap">
+            MARKET CLOSED
+          </span>
+        </div>
+      )}
 
       {/* 2. MAIN TRADINGVIEW CHART CANVAS */}
       <div className="flex flex-1 flex-col relative overflow-hidden bg-(--card-bg) min-h-125">
