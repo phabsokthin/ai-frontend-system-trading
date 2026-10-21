@@ -8,6 +8,7 @@ import {
   BarChart3,
   CheckCircle2,
   Clock,
+  Cloud,
   Compass,
   Layers,
   Newspaper,
@@ -23,6 +24,7 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
+import { syncApiDataToFirestore, resetFirestoreSyncCache } from "../composable/useCollection";
 
 const BACKEND_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ??
@@ -201,7 +203,43 @@ export default function TradeSignalsAndAnalysis({
   const [marketStatus, setMarketStatus] = useState<{ is_market_closed: boolean; reason: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
+  const [firestoreSyncedTime, setFirestoreSyncedTime] = useState<string>("");
+  const [firestoreSyncError, setFirestoreSyncError] = useState<string>("");
+  const [firestoreSyncStats, setFirestoreSyncStats] = useState<{ trades: number; signals: number; analysis: number } | null>(null);
+  const [isSyncingFirestore, setIsSyncingFirestore] = useState<boolean>(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Trigger manual force sync to Firestore
+  const handleForceFirestoreSync = async () => {
+    setIsSyncingFirestore(true);
+    setFirestoreSyncError("");
+    try {
+      const syncRes = await syncApiDataToFirestore({
+        activeTrade,
+        trades: tradeHistory,
+        signals: signalsHistory,
+        latestAnalysis,
+        analysisHistory,
+        force: true,
+      });
+
+      if (syncRes.success) {
+        setFirestoreSyncedTime(new Date().toLocaleTimeString());
+        setFirestoreSyncStats({
+          trades: syncRes.tradesPushed,
+          signals: syncRes.signalsPushed,
+          analysis: syncRes.analysisPushed,
+        });
+        setFirestoreSyncError("");
+      } else {
+        setFirestoreSyncError(syncRes.error || "Firestore sync failed");
+      }
+    } catch (err: any) {
+      setFirestoreSyncError(err?.message || String(err));
+    } finally {
+      setIsSyncingFirestore(false);
+    }
+  };
 
   // Fetch all live data
   const fetchData = useCallback(async () => {
@@ -295,6 +333,31 @@ export default function TradeSignalsAndAnalysis({
         });
         setAnalysisHistory(sortedAnalysis);
       }
+
+      // Synchronize and push API data to Firestore collections: trades, signals, analysis
+      syncApiDataToFirestore({
+        activeTrade: activeRes?.active ? (activeRes.position || activeRes.setup) : null,
+        trades: historyRes?.trades,
+        signals: signalsRes?.signals,
+        latestAnalysis: analysisRes,
+        analysisHistory: analysisHistRes?.history,
+      }).then((syncRes) => {
+        if (syncRes.success) {
+          setFirestoreSyncedTime(new Date().toLocaleTimeString());
+          setFirestoreSyncError("");
+          setFirestoreSyncStats({
+            trades: syncRes.tradesPushed,
+            signals: syncRes.signalsPushed,
+            analysis: syncRes.analysisPushed,
+          });
+        } else {
+          console.warn("[TradeSignalsAndAnalysis] Background Firestore sync reported error:", syncRes.error);
+          setFirestoreSyncError(syncRes.error || "Sync error");
+        }
+      }).catch((syncErr) => {
+        console.warn("[TradeSignalsAndAnalysis] Background Firestore sync error:", syncErr);
+        setFirestoreSyncError(String(syncErr));
+      });
 
       setLastRefreshed(new Date().toLocaleTimeString());
     } catch {
@@ -411,11 +474,43 @@ export default function TradeSignalsAndAnalysis({
         </div>
 
         {/* Status Actions */}
-        <div className="flex items-center gap-3 text-xs text-(--muted)">
+        <div className="flex flex-wrap items-center gap-2.5 text-xs text-(--muted)">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-medium hidden sm:inline">Live Sync</span>
+            <span className="text-[11px] font-medium hidden sm:inline">Live API</span>
           </div>
+
+          {/* Clickable Firestore Sync Badge & Force Trigger */}
+          <button
+            type="button"
+            onClick={handleForceFirestoreSync}
+            disabled={isSyncingFirestore}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono transition-all cursor-pointer ${
+              firestoreSyncError
+                ? "bg-rose-950/30 border-rose-500/40 text-rose-400 hover:bg-rose-950/50"
+                : firestoreSyncedTime
+                ? "bg-emerald-950/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/40"
+                : "bg-(--pill-bg) border-(--card-border) text-blue-400 hover:bg-(--panel-hover)"
+            }`}
+            title={
+              firestoreSyncError
+                ? `Firestore Error: ${firestoreSyncError}. Click to retry.`
+                : firestoreSyncedTime
+                ? `Firestore synchronized at ${firestoreSyncedTime}. Click to force re-sync.`
+                : "Synchronizing data with Firestore. Click to force sync."
+            }
+          >
+            <Cloud size={13} className={isSyncingFirestore ? "animate-bounce text-blue-400" : firestoreSyncError ? "text-rose-400" : "text-emerald-400"} />
+            <span>
+              {isSyncingFirestore
+                ? "Pushing..."
+                : firestoreSyncError
+                ? "Sync Error (Retry)"
+                : firestoreSyncedTime
+                ? `Synced ${firestoreSyncedTime}`
+                : "Sync to Firestore"}
+            </span>
+          </button>
 
           {lastRefreshed && (
             <span className="text-[11px] font-mono hidden md:inline">
@@ -434,6 +529,40 @@ export default function TradeSignalsAndAnalysis({
           </button>
         </div>
       </div>
+
+      {/* Sync Error Notice Banner (if any) */}
+      {firestoreSyncError && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-950/30 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+            <span>
+              <strong>Firestore Sync Issue:</strong> {firestoreSyncError}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleForceFirestoreSync}
+            className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-white font-semibold text-[11px] transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Retry Now
+          </button>
+        </div>
+      )}
+
+      {/* Sync Success Stats Notice (when newly pushed) */}
+      {firestoreSyncStats && (firestoreSyncStats.trades > 0 || firestoreSyncStats.signals > 0 || firestoreSyncStats.analysis > 0) && (
+        <div className="mx-4 mt-3 p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span>
+              <strong>Pushed to Firestore:</strong> {firestoreSyncStats.trades} trades, {firestoreSyncStats.signals} signals, {firestoreSyncStats.analysis} analysis snapshots.
+            </span>
+          </div>
+          <span className="text-[10px] text-emerald-400/80 font-mono">
+            Collections updated
+          </span>
+        </div>
+      )}
 
       {/* 2. TAB 1: AI SIGNALS & ACTIVE SETUPS */}
       {activeTab === "signals" && (

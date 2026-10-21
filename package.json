@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "firebase": "^13.0.0",
     "lightweight-charts": "^5.2.1",
     "lightweight-charts-drawing": "^0.6.2",
     "lucide-react": "^1.57.0",

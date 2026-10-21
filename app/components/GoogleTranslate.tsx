@@ -75,10 +75,73 @@ export default function GoogleTranslate({
     return "en";
   }, []);
 
+  // Clean up Google Translate top banner whenever it renders
+  const cleanupGoogleBanner = useCallback(() => {
+    if (typeof document === "undefined") return;
+
+    // 1. Force body top offset to 0 and remove unwanted Google inline styles
+    if (document.body) {
+      if (document.body.style.top && document.body.style.top !== "0px") {
+        document.body.style.setProperty("top", "0px", "important");
+      }
+      if (document.body.style.position === "relative") {
+        document.body.style.setProperty("position", "static", "important");
+      }
+    }
+
+    // 2. Hide all banner frames, skiptranslate wrappers, and iframe containers
+    const bannerElements = document.querySelectorAll<HTMLElement>(
+      ".goog-te-banner-frame, iframe.goog-te-banner-frame, body > .skiptranslate, body > iframe.skiptranslate, iframe[id*=':1.container'], iframe[id*=':2.container'], .goog-te-banner, div[class*='skiptranslate']:not(.notranslate)"
+    );
+    bannerElements.forEach((el) => {
+      if (el.closest && el.closest(".notranslate")) return;
+      el.style.setProperty("display", "none", "important");
+      el.style.setProperty("visibility", "hidden", "important");
+      el.style.setProperty("height", "0", "important");
+      el.style.setProperty("opacity", "0", "important");
+      el.style.setProperty("pointer-events", "none", "important");
+    });
+  }, []);
+
   // Initialize Google Translate Script
   useEffect(() => {
     const initialLang = getStoredLang();
     setCurrentLang(initialLang);
+
+    // Inject highest-priority stylesheet into head to immediately hide the banner iframe
+    if (!document.getElementById("google-translate-hide-banner-style")) {
+      const styleEl = document.createElement("style");
+      styleEl.id = "google-translate-hide-banner-style";
+      styleEl.innerHTML = `
+        body > .skiptranslate,
+        body > iframe.skiptranslate,
+        .skiptranslate iframe,
+        .goog-te-banner-frame,
+        .goog-te-banner-frame.skiptranslate,
+        iframe.goog-te-banner-frame,
+        iframe[class*="goog-te-banner-frame"],
+        iframe[id*=":1.container"],
+        iframe[id*=":2.container"],
+        .goog-te-banner,
+        #goog-gt-tt,
+        .goog-te-balloon-frame,
+        .goog-tooltip {
+          display: none !important;
+          visibility: hidden !important;
+          height: 0 !important;
+          width: 0 !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+        body,
+        html.translated-ltr body,
+        html.translated-rtl body {
+          top: 0px !important;
+          position: static !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
 
     // Ensure single hidden Google Translate container in DOM
     if (!document.getElementById("google_translate_element")) {
@@ -113,15 +176,30 @@ export default function GoogleTranslate({
       document.body.appendChild(script);
     }
 
+    cleanupGoogleBanner();
+
+    // Active observer to suppress banner whenever Google Translate attempts to show it
+    const observer = new MutationObserver(() => {
+      cleanupGoogleBanner();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
+
     // Listen for cross-component sync
     const handleLangSync = (e: CustomEvent<{ lang: Language }>) => {
       setCurrentLang(e.detail.lang);
+      cleanupGoogleBanner();
     };
     window.addEventListener("goldpilot-lang-change" as any, handleLangSync);
     return () => {
+      observer.disconnect();
       window.removeEventListener("goldpilot-lang-change" as any, handleLangSync);
     };
-  }, [getStoredLang]);
+  }, [getStoredLang, cleanupGoogleBanner]);
 
   // Handle switching language
   const switchLanguage = (lang: Language) => {
@@ -148,6 +226,10 @@ export default function GoogleTranslate({
     if (combo) {
       combo.value = lang;
       combo.dispatchEvent(new Event("change"));
+      setTimeout(cleanupGoogleBanner, 50);
+      setTimeout(cleanupGoogleBanner, 200);
+      setTimeout(cleanupGoogleBanner, 600);
+      setTimeout(cleanupGoogleBanner, 1200);
     } else {
       // Reload page if combo not ready so cookie is processed
       window.location.reload();
@@ -159,6 +241,7 @@ export default function GoogleTranslate({
     const next = currentLang === "en" ? "km" : "en";
     switchLanguage(next);
   };
+
 
   if (variant === "sidebar") {
     return (

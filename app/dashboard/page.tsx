@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import GoogleTranslate from "../components/GoogleTranslate";
 import { formatCambodiaTime } from "../utils/dateFormat";
+import { syncApiDataToFirestore } from "../composable/useCollection";
 
 const BACKEND_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ??
@@ -145,6 +146,38 @@ export default function Dashboard() {
         const data: ReportData = await res.json();
         setReport(data);
         setLastUpdated(new Date().toLocaleTimeString());
+
+        // Background sync to Firestore collections
+        syncApiDataToFirestore({
+          activeTrade: data.active_trade,
+          trades: data.recent_trades?.map((t) => ({
+            id: t.id,
+            direction: t.side,
+            entry_price: parseFloat(t.entry.replace(/[^0-9.]/g, "")) || 0,
+            exit_price: parseFloat(t.exit.replace(/[^0-9.]/g, "")) || undefined,
+            pnl_points: t.pnl_points,
+            status: t.status,
+            exit_time: t.exit_time,
+            exit_reason: t.exit_reason,
+          })),
+          latestAnalysis: data.market_snapshot ? {
+            timestamp_utc: data.generated_at || new Date().toISOString(),
+            symbol: data.market_snapshot.symbol || "XAU/USD",
+            price: data.market_snapshot.price,
+            signal: data.market_snapshot.entry_signal || data.market_snapshot.action,
+            action: data.market_snapshot.action,
+            multi_timeframe: {
+              htf_trend: data.market_snapshot.macro_trend,
+              htf_rsi: data.market_snapshot.htf_rsi,
+              entry_signal: data.market_snapshot.entry_signal,
+            },
+            support_resistance: {
+              pivot_point: data.market_snapshot.pivot_point,
+            },
+          } : undefined,
+        }).catch((syncErr) => {
+          console.warn("[Dashboard] Background Firestore sync notice:", syncErr);
+        });
       }
     } catch (err) {
       console.warn("Failed fetching live report:", err);
