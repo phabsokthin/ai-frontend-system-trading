@@ -107,6 +107,7 @@ export interface AnalysisDocument extends DocumentData {
   timestamp_utc?: string;
   symbol?: string;
   price?: number;
+  current_price?: number;
   signal?: string;
   action?: string;
   trade_status?: string;
@@ -556,10 +557,27 @@ export const useAnalysis = (options: UseAnalysisOptions = {}) => {
         limit(limitCount)
       );
       const snapshot = await getDocs(q);
-      const items: AnalysisDocument[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
+      const items: AnalysisDocument[] = [];
+      const seenCandles = new Set<string>();
+
+      for (const d of snapshot.docs) {
+        if (d.id === "latest") continue;
+        const data = d.data() as AnalysisDocument;
+        const item: AnalysisDocument = { id: d.id, ...data };
+        const ts = item.timestamp_utc || "";
+        let candleKey = d.id;
+        if (ts) {
+          const t = new Date(ts).getTime();
+          if (!isNaN(t)) {
+            candleKey = `${Math.floor(t / (5 * 60 * 1000))}_${item.symbol || "XAU/USD"}`;
+          }
+        }
+        if (!seenCandles.has(candleKey)) {
+          seenCandles.add(candleKey);
+          items.push(item);
+        }
+      }
+
       setAnalysisList(items);
     } catch (err: any) {
       console.error("Error fetching analysis records:", err);
@@ -587,10 +605,27 @@ export const useAnalysis = (options: UseAnalysisOptions = {}) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const items: AnalysisDocument[] = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
+        const items: AnalysisDocument[] = [];
+        const seenCandles = new Set<string>();
+
+        for (const d of snapshot.docs) {
+          if (d.id === "latest") continue;
+          const data = d.data() as AnalysisDocument;
+          const item: AnalysisDocument = { id: d.id, ...data };
+          const ts = item.timestamp_utc || "";
+          let candleKey = d.id;
+          if (ts) {
+            const t = new Date(ts).getTime();
+            if (!isNaN(t)) {
+              candleKey = `${Math.floor(t / (5 * 60 * 1000))}_${item.symbol || "XAU/USD"}`;
+            }
+          }
+          if (!seenCandles.has(candleKey)) {
+            seenCandles.add(candleKey);
+            items.push(item);
+          }
+        }
+
         setAnalysisList(items);
         setLoading(false);
       },
@@ -652,10 +687,17 @@ export function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Rec
     if (key === "_id") continue;
     if (val === undefined) continue;
 
-    if (
+    if (Array.isArray(val)) {
+      result[key] = val
+        .filter((item) => item !== undefined)
+        .map((item) =>
+          item !== null && typeof item === "object" && !(item instanceof Date)
+            ? sanitizeForFirestore(item)
+            : item
+        );
+    } else if (
       val !== null &&
       typeof val === "object" &&
-      !Array.isArray(val) &&
       !(val instanceof Date) &&
       !("_methodName" in val) &&
       !val.constructor?.name?.includes("FieldValue") &&
@@ -674,12 +716,14 @@ const syncedTradesCache = new Map<string, string>();
 const syncedSignalsCache = new Set<string>();
 const syncedAnalysisCache = new Set<string>();
 let lastSyncedAnalysisTimestamp: string | null = null;
+let lastSyncedLatestSignature: string | null = null;
 
 export function resetFirestoreSyncCache() {
   syncedTradesCache.clear();
   syncedSignalsCache.clear();
   syncedAnalysisCache.clear();
   lastSyncedAnalysisTimestamp = null;
+  lastSyncedLatestSignature = null;
   console.log("[Firestore Sync] In-memory sync cache cleared.");
 }
 
@@ -796,6 +840,7 @@ export async function syncApiDataToFirestore(payload: SyncApiDataPayload): Promi
   const pendingSignals = new Set<string>();
   const pendingAnalysis = new Set<string>();
   let pendingAnalysisTs: string | null = null;
+  let pendingLatestSig: string | null = null;
 
   try {
     const batch = writeBatch(db);
@@ -851,124 +896,210 @@ export async function syncApiDataToFirestore(payload: SyncApiDataPayload): Promi
       }
     }
 
-    // 3. Sync Signals (from signals array or extracted from analysis setups)
-    const signalsToSync: any[] = Array.isArray(payload.signals) ? [...payload.signals] : [];
+    // 3. Sync Signals with 100% Consistency to DB (prunes extras/duplicates in Firestore)
+    if (Array.isArray(payload.signals)) {
+      const validDbSignalIds = new Set<string>();
+      const validDbSetupIds = new Set<string>();
 
-    // Fallback: if signals array is empty, extract signals from latestAnalysis or analysisHistory
-    if (signalsToSync.length === 0) {
-      if (payload.latestAnalysis && (payload.latestAnalysis.has_setup || (payload.latestAnalysis.signal && payload.latestAnalysis.signal !== "WAIT"))) {
-        signalsToSync.push({
-          id: `signal_${(payload.latestAnalysis.timestamp_utc || "").replace(/[:.]/g, "_")}_${payload.latestAnalysis.signal || "SETUP"}`,
-          symbol: payload.latestAnalysis.symbol || "XAU/USD",
-          signal: payload.latestAnalysis.signal,
-          action: payload.latestAnalysis.action,
-          price: payload.latestAnalysis.price,
-          stop_loss: payload.latestAnalysis.stop_loss || payload.latestAnalysis.sl,
-          take_profit: payload.latestAnalysis.take_profit || payload.latestAnalysis.tp,
-          confidence: payload.latestAnalysis.setup?.confidence || "HIGH",
-          reason: payload.latestAnalysis.reason,
-          setup: payload.latestAnalysis.setup,
-          timestamp_utc: payload.latestAnalysis.timestamp_utc,
-        });
+      for (const s of payload.signals) {
+        if (!s) continue;
+        const sigId = String(
+          s.setup_id ||
+          s.id ||
+          (s.timestamp_utc ? `signal_${s.timestamp_utc.replace(/[:.]/g, "_")}_${s.signal || "SETUP"}` : "") ||
+          `signal_${Date.now()}`
+        ).replace(/\//g, "_");
+
+        validDbSignalIds.add(sigId);
+        if (s.setup_id) validDbSetupIds.add(String(s.setup_id));
+
+        if (!syncedSignalsCache.has(sigId) && opCount < 450) {
+          const docRef = doc(db, COLLECTIONS.SIGNALS, sigId);
+          const cleanSignal = {
+            id: sigId,
+            setup_id: s.setup_id || sigId,
+            timestamp_utc: s.timestamp_utc || new Date().toISOString(),
+            symbol: s.symbol || "XAU/USD",
+            signal: s.signal,
+            action: s.action || `OPEN_${s.signal}`,
+            price: s.price,
+            stop_loss: s.stop_loss || s.sl,
+            take_profit: s.take_profit || s.tp,
+            confidence: s.confidence || s.setup?.confidence || "HIGH",
+            reason: s.reason,
+            setup: s.setup,
+            is_new_entry: true,
+            updatedAt: serverTimestamp(),
+            createdAt: s.createdAt || s.created_at || serverTimestamp(),
+          };
+          batch.set(docRef, sanitizeForFirestore(cleanSignal), { merge: true });
+          pendingSignals.add(sigId);
+          opCount++;
+          signalsPushed++;
+        }
       }
 
-      if (Array.isArray(payload.analysisHistory)) {
-        for (const a of payload.analysisHistory) {
-          if (a && (a.has_setup || (a.signal && a.signal !== "WAIT"))) {
-            signalsToSync.push({
-              id: `signal_${(a.timestamp_utc || "").replace(/[:.]/g, "_")}_${a.signal || "SETUP"}`,
-              symbol: a.symbol || "XAU/USD",
-              signal: a.signal,
-              action: a.action,
-              price: a.price,
-              stop_loss: a.stop_loss || a.sl,
-              take_profit: a.take_profit || a.tp,
-              confidence: a.setup?.confidence || "HIGH",
-              reason: a.reason,
-              setup: a.setup,
-              timestamp_utc: a.timestamp_utc,
-            });
+      // Query Firestore signals collection to prune any duplicates, stale, or deleted signals
+      try {
+        const firestoreSignalsSnap = await getDocs(query(collection(db, COLLECTIONS.SIGNALS), limit(50)));
+        for (const fDoc of firestoreSignalsSnap.docs) {
+          const fId = fDoc.id;
+          const data = fDoc.data();
+          const fSetupId = String(data.setup_id || data.id || "");
+
+          // Check if document is an unknown signal or duplicate format
+          const isExactDbMatch = validDbSignalIds.has(fId);
+          const isDuplicateTimestampDoc = !isExactDbMatch && fSetupId && validDbSetupIds.has(fSetupId);
+          const isDeletedFromDb = !isExactDbMatch && (!fSetupId || !validDbSetupIds.has(fSetupId));
+
+          if ((isDuplicateTimestampDoc || isDeletedFromDb) && opCount < 450) {
+            batch.delete(fDoc.ref);
+            opCount++;
+            console.log(`[Firestore Sync] Pruned inconsistent signal document from Firestore: ${fId}`);
           }
+        }
+      } catch (pruneErr) {
+        console.warn("[Firestore Sync] Notice during signal pruning:", pruneErr);
+      }
+    } else if (payload.latestAnalysis) {
+      // Fallback: If signals array was not provided, sync new entry if confirmed
+      const latest = payload.latestAnalysis;
+      const isNewEntry = Boolean(
+        latest && (
+          latest.is_new_entry === true ||
+          latest.action === "OPEN_BUY" ||
+          latest.action === "OPEN_SELL"
+        ) &&
+        latest.signal &&
+        latest.signal !== "WAIT"
+      );
+
+      if (isNewEntry) {
+        const activePos = latest.active_position || latest.setup || {};
+        const rawId = String(
+          activePos.setup_id ||
+          activePos.id ||
+          (latest.timestamp_utc ? `signal_${latest.timestamp_utc.replace(/[:.]/g, "_")}_${latest.signal}` : "") ||
+          `signal_${Date.now()}_${latest.signal}`
+        );
+        const sigId = rawId.replace(/\//g, "_");
+
+        if (!syncedSignalsCache.has(sigId) && opCount < 450) {
+          const docRef = doc(db, COLLECTIONS.SIGNALS, sigId);
+          const cleanSignal = {
+            id: sigId,
+            setup_id: activePos.setup_id || activePos.id || sigId,
+            timestamp_utc: latest.timestamp_utc || new Date().toISOString(),
+            symbol: latest.symbol || "XAU/USD",
+            signal: latest.signal,
+            action: latest.action || `OPEN_${latest.signal}`,
+            price: latest.price,
+            stop_loss: latest.stop_loss || latest.sl,
+            take_profit: latest.take_profit || latest.tp,
+            confidence: latest.setup?.confidence || "HIGH",
+            reason: latest.reason,
+            setup: latest.setup,
+            is_new_entry: true,
+            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+          };
+          batch.set(docRef, sanitizeForFirestore(cleanSignal), { merge: true });
+          pendingSignals.add(sigId);
+          opCount++;
+          signalsPushed++;
         }
       }
     }
 
-    for (const s of signalsToSync) {
-      if (!s) continue;
-      const rawId = String(
-        s.id ||
-        s.setup_id ||
-        s.analysis_id ||
-        `signal_${(s.timestamp_utc || "").replace(/[:.]/g, "_")}_${s.signal || s.action || "SIGNAL"}`
-      );
-      const sigId = rawId.replace(/\//g, "_");
-
-      if (!syncedSignalsCache.has(sigId) && opCount < 450) {
-        const docRef = doc(db, COLLECTIONS.SIGNALS, sigId);
-        const clean = {
-          ...sanitizeForFirestore(s),
-          id: sigId,
-          updatedAt: serverTimestamp(),
-          createdAt: s.createdAt || s.created_at || serverTimestamp(),
-        };
-        batch.set(docRef, clean, { merge: true });
-        pendingSignals.add(sigId);
-        opCount++;
-        signalsPushed++;
-      }
-    }
-
-    // 4. Sync Latest Analysis
-    if (payload.latestAnalysis && payload.latestAnalysis.timestamp_utc) {
+    // 4. Sync Latest Analysis (points to current market snapshot)
+    if (payload.latestAnalysis) {
       const a = payload.latestAnalysis;
-      const ts = a.timestamp_utc;
+      const ts = a.timestamp_utc || new Date().toISOString();
+      const priceVal = a.current_price !== undefined ? a.current_price : a.price;
+      const reasonVal = a.reason || a.message || a.setup?.reasons?.[0] || "Analysis completed";
 
-      if (lastSyncedAnalysisTimestamp !== ts && opCount < 450) {
-        // Document: "latest" (always points to most recent state)
+      // Always keep "latest" doc in sync with newest price & timestamp
+      const latestSig = `${ts}_${priceVal}_${a.signal || a.action || ""}_${reasonVal}`;
+      if ((lastSyncedLatestSignature !== latestSig || payload.force) && opCount < 450) {
         const latestDocRef = doc(db, COLLECTIONS.ANALYSIS, "latest");
         const cleanLatest = {
           ...sanitizeForFirestore(a),
           id: "latest",
+          price: priceVal,
+          current_price: priceVal,
+          reason: reasonVal,
           updatedAt: serverTimestamp(),
-          createdAt: a.createdAt || serverTimestamp(),
+          createdAt: a.createdAt || a.created_at || serverTimestamp(),
         };
         batch.set(latestDocRef, cleanLatest, { merge: true });
+        pendingLatestSig = latestSig;
         opCount++;
         analysisPushed++;
+      }
 
-        // Document: timestamp snapshot for historical tracking
-        const histId = `analysis_${ts.replace(/[:.]/g, "_")}`.replace(/\//g, "_");
+      // Compute canonical 5-minute candle identifier (e.g. analysis_2026-10-22T03_15)
+      let candleKey = "";
+      try {
+        const d = new Date(ts);
+        const candleMinutes = Math.floor(d.getUTCMinutes() / 5) * 5;
+        candleKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}T${String(d.getUTCHours()).padStart(2, "0")}_${String(candleMinutes).padStart(2, "0")}`;
+      } catch {
+        candleKey = ts.replace(/[:.]/g, "_").slice(0, 16);
+      }
+      const histId = `analysis_${candleKey}`;
+
+      if ((!syncedAnalysisCache.has(histId) || payload.force) && opCount < 450) {
         const histDocRef = doc(db, COLLECTIONS.ANALYSIS, histId);
         const cleanHist = {
           ...sanitizeForFirestore(a),
           id: histId,
+          candle_key: candleKey,
+          price: priceVal,
+          current_price: priceVal,
+          reason: reasonVal,
           updatedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
+          createdAt: a.createdAt || a.created_at || serverTimestamp(),
         };
         batch.set(histDocRef, cleanHist, { merge: true });
+        pendingAnalysis.add(histId);
         opCount++;
         analysisPushed++;
-
-        pendingAnalysisTs = ts;
       }
     }
 
-    // 5. Sync Historical Analysis
+    // 5. Sync Historical Analysis Snapshots (if provided in payload)
     if (Array.isArray(payload.analysisHistory)) {
-      for (const a of payload.analysisHistory) {
-        if (!a || !a.timestamp_utc) continue;
-        const docId = `analysis_${a.timestamp_utc.replace(/[:.]/g, "_")}`.replace(/\//g, "_");
+      for (const item of payload.analysisHistory) {
+        if (!item) continue;
+        const ts = item.timestamp_utc || item.created_at;
+        if (!ts) continue;
 
-        if (!syncedAnalysisCache.has(docId) && opCount < 450) {
-          const docRef = doc(db, COLLECTIONS.ANALYSIS, docId);
-          const clean = {
-            ...sanitizeForFirestore(a),
-            id: docId,
+        let candleKey = "";
+        try {
+          const d = new Date(ts);
+          const candleMinutes = Math.floor(d.getUTCMinutes() / 5) * 5;
+          candleKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}T${String(d.getUTCHours()).padStart(2, "0")}_${String(candleMinutes).padStart(2, "0")}`;
+        } catch {
+          candleKey = String(ts).replace(/[:.]/g, "_").slice(0, 16);
+        }
+        const histId = `analysis_${candleKey}`;
+
+        if ((!syncedAnalysisCache.has(histId) || payload.force) && opCount < 450) {
+          const histDocRef = doc(db, COLLECTIONS.ANALYSIS, histId);
+          const pVal = item.current_price !== undefined ? item.current_price : item.price;
+          const rVal = item.reason || item.message || "Market analysis snapshot";
+          const cleanHist = {
+            ...sanitizeForFirestore(item),
+            id: histId,
+            candle_key: candleKey,
+            price: pVal,
+            current_price: pVal,
+            reason: rVal,
             updatedAt: serverTimestamp(),
-            createdAt: serverTimestamp(),
+            createdAt: item.createdAt || item.created_at || serverTimestamp(),
           };
-          batch.set(docRef, clean, { merge: true });
-          pendingAnalysis.add(docId);
+          batch.set(histDocRef, cleanHist, { merge: true });
+          pendingAnalysis.add(histId);
           opCount++;
           analysisPushed++;
         }
@@ -986,7 +1117,7 @@ export async function syncApiDataToFirestore(payload: SyncApiDataPayload): Promi
       for (const [k, v] of pendingTrades.entries()) syncedTradesCache.set(k, v);
       for (const k of pendingSignals) syncedSignalsCache.add(k);
       for (const k of pendingAnalysis) syncedAnalysisCache.add(k);
-      if (pendingAnalysisTs) lastSyncedAnalysisTimestamp = pendingAnalysisTs;
+      if (pendingLatestSig) lastSyncedLatestSignature = pendingLatestSig;
     }
 
     return {

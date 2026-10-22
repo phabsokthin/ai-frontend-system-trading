@@ -103,12 +103,20 @@ type ReportData = {
   } | null;
   market_snapshot?: {
     symbol?: string;
+    timestamp_utc?: string;
     price?: number;
+    current_price?: number;
+    signal?: string;
     macro_trend?: string;
     htf_rsi?: number;
     entry_signal?: string;
     action?: string;
+    reason?: string;
     pivot_point?: number;
+    stop_loss?: number;
+    take_profit?: number;
+    sl?: number;
+    tp?: number;
   };
   market_status?: {
     is_market_closed?: boolean;
@@ -161,11 +169,17 @@ export default function Dashboard() {
             exit_reason: t.exit_reason,
           })),
           latestAnalysis: data.market_snapshot ? {
-            timestamp_utc: data.generated_at || new Date().toISOString(),
+            timestamp_utc: data.market_snapshot.timestamp_utc || data.generated_at || new Date().toISOString(),
             symbol: data.market_snapshot.symbol || "XAU/USD",
-            price: data.market_snapshot.price,
-            signal: data.market_snapshot.entry_signal || data.market_snapshot.action,
+            price: data.market_snapshot.price ?? data.market_snapshot.current_price,
+            current_price: data.market_snapshot.current_price ?? data.market_snapshot.price,
+            signal: data.market_snapshot.signal || data.market_snapshot.entry_signal || data.market_snapshot.action,
             action: data.market_snapshot.action,
+            reason: data.market_snapshot.reason || "Live market analysis",
+            stop_loss: data.market_snapshot.stop_loss || data.market_snapshot.sl,
+            take_profit: data.market_snapshot.take_profit || data.market_snapshot.tp,
+            sl: data.market_snapshot.sl || data.market_snapshot.stop_loss,
+            tp: data.market_snapshot.tp || data.market_snapshot.take_profit,
             multi_timeframe: {
               htf_trend: data.market_snapshot.macro_trend,
               htf_rsi: data.market_snapshot.htf_rsi,
@@ -173,6 +187,7 @@ export default function Dashboard() {
             },
             support_resistance: {
               pivot_point: data.market_snapshot.pivot_point,
+              current_price: data.market_snapshot.current_price ?? data.market_snapshot.price,
             },
           } : undefined,
         }).catch((syncErr) => {

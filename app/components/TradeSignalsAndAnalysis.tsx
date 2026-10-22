@@ -101,6 +101,7 @@ type LatestAnalysis = {
   timestamp_utc?: string;
   symbol?: string;
   price?: number;
+  current_price?: number;
   signal?: string;
   action?: string;
   trade_status?: string;
@@ -167,6 +168,7 @@ type AnalysisHistoryItem = {
   timestamp_utc: string;
   symbol: string;
   price?: number;
+  current_price?: number;
   signal?: string;
   action?: string;
   reason?: string;
@@ -265,8 +267,8 @@ export default function TradeSignalsAndAnalysis({
         .catch(() => null);
 
       // 4. Fetch latest scheduled analysis
-      const analysisPromise = fetch(`${BACKEND_BASE_URL}/api/analysis/latest`)
-        .then((r) => (r.ok ? r.json() : null))
+      const analysisPromise = fetch(`${BACKEND_BASE_URL}/api/signals/latest`)
+        .then((r) => (r.ok ? r.json() : fetch(`${BACKEND_BASE_URL}/api/analysis/latest`).then((r2) => (r2.ok ? r2.json() : null))))
         .catch(() => null);
 
       // 5. Fetch historical analysis snapshots
@@ -324,23 +326,44 @@ export default function TradeSignalsAndAnalysis({
         setLatestAnalysis(analysisRes);
       }
 
-      // Order analysis snapshots DESC (newest timestamp first)
+      // Order analysis snapshots DESC (newest timestamp first), deduplicating within same 5m candle
+      let dedupedAnalysis: AnalysisHistoryItem[] = [];
       if (analysisHistRes && Array.isArray(analysisHistRes.history)) {
         const sortedAnalysis = [...analysisHistRes.history].sort((a, b) => {
           const tA = new Date(a.timestamp_utc || a.created_at || 0).getTime();
           const tB = new Date(b.timestamp_utc || b.created_at || 0).getTime();
           return tB - tA;
         });
-        setAnalysisHistory(sortedAnalysis);
+
+        const seenCandles = new Set<string>();
+        for (const item of sortedAnalysis) {
+          const t = new Date(item.timestamp_utc || item.created_at || 0).getTime();
+          let candleKey = String(item._id || "");
+          if (!isNaN(t) && t > 0) {
+            candleKey = `${Math.floor(t / (5 * 60 * 1000))}_${item.symbol || "XAU/USD"}`;
+          }
+          if (!seenCandles.has(candleKey)) {
+            seenCandles.add(candleKey);
+            dedupedAnalysis.push(item);
+          }
+        }
+        setAnalysisHistory(dedupedAnalysis);
       }
 
-      // Synchronize and push API data to Firestore collections: trades, signals, analysis
+      // Synchronize and push API data to Firestore collections: active trade, trades, signals, and latest analysis
       syncApiDataToFirestore({
         activeTrade: activeRes?.active ? (activeRes.position || activeRes.setup) : null,
         trades: historyRes?.trades,
         signals: signalsRes?.signals,
         latestAnalysis: analysisRes,
-        analysisHistory: analysisHistRes?.history,
+        analysisHistory:
+          analysisHistRes && Array.isArray(analysisHistRes.history) && analysisHistRes.history.length > 0
+            ? analysisHistRes.history
+            : dedupedAnalysis.length > 0
+            ? dedupedAnalysis
+            : analysisRes
+            ? [analysisRes]
+            : [],
       }).then((syncRes) => {
         if (syncRes.success) {
           setFirestoreSyncedTime(new Date().toLocaleTimeString());
@@ -947,7 +970,7 @@ export default function TradeSignalsAndAnalysis({
                         {latestAnalysis.multi_timeframe?.htf_trend || "NEUTRAL"}
                       </span>
                       <span className="text-xs text-white font-mono font-semibold">
-                        {latestAnalysis.symbol || "XAU/USD"} @ {latestAnalysis.price?.toFixed(2)}
+                        {latestAnalysis.symbol || "XAU/USD"} @ ${Number(latestAnalysis.current_price ?? latestAnalysis.price ?? 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1200,12 +1223,13 @@ export default function TradeSignalsAndAnalysis({
                       <thead>
                         <tr className="border-b border-(--card-border) bg-(--panel) text-(--muted)">
                           <th className="py-2.5 px-3">Time (UTC)</th>
-                          <th className="py-2.5 px-3">Price</th>
+                          <th className="py-2.5 px-3">Current Price</th>
                           <th className="py-2.5 px-3">Macro Trend (1H)</th>
                           <th className="py-2.5 px-3">HTF RSI</th>
                           <th className="py-2.5 px-3">Signal</th>
                           <th className="py-2.5 px-3">Action</th>
                           <th className="py-2.5 px-3">Pivot (P)</th>
+                          <th className="py-2.5 px-3">Rationale</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-(--card-border)">
@@ -1213,14 +1237,15 @@ export default function TradeSignalsAndAnalysis({
                           const sig = item.signal || "WAIT";
                           const trend = item.multi_timeframe?.htf_trend || "—";
                           const pivot = item.support_resistance?.classic?.pivot || item.support_resistance?.pivot_point;
+                          const currentP = item.current_price ?? item.price;
 
                           return (
                             <tr key={item._id || idx} className="hover:bg-(--panel)/60 transition-colors">
                               <td className="py-2.5 px-3 font-mono text-(--muted) whitespace-nowrap">
                                 {formatTime(item.timestamp_utc || item.created_at)}
                               </td>
-                              <td className="py-2.5 px-3 font-mono font-semibold text-white">
-                                {item.price ? Number(item.price).toFixed(2) : "—"}
+                              <td className="py-2.5 px-3 font-mono font-semibold text-white whitespace-nowrap">
+                                {currentP ? `$${Number(currentP).toFixed(2)}` : "—"}
                               </td>
                               <td className="py-2.5 px-3">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${trend === "BULLISH"
@@ -1229,7 +1254,7 @@ export default function TradeSignalsAndAnalysis({
                                       ? "bg-red-500/15 text-red-400 border border-red-500/30"
                                       : "bg-gray-500/15 text-gray-400"
                                   }`}>
-                                  {trend}
+                                   {trend}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3 font-mono text-white">
@@ -1242,14 +1267,17 @@ export default function TradeSignalsAndAnalysis({
                                       ? "bg-red-500/15 text-red-400 border border-red-500/30"
                                       : "bg-gray-500/15 text-gray-400 border border-gray-500/30"
                                   }`}>
-                                  {sig}
+                                   {sig}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3 font-mono text-[11px] text-(--muted)">
                                 {item.action || "HOLD"}
                               </td>
                               <td className="py-2.5 px-3 font-mono text-(--muted)">
-                                {pivot ? Number(pivot).toFixed(2) : "—"}
+                                {pivot ? `$${Number(pivot).toFixed(2)}` : "—"}
+                              </td>
+                              <td className="py-2.5 px-3 text-(--muted) max-w-64 truncate" title={item.reason}>
+                                {item.reason || "—"}
                               </td>
                             </tr>
                           );
